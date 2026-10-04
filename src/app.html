@@ -1,0 +1,966 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WoWS Replay Results</title>
+<script>
+  // Apply the saved theme before first paint to avoid a flash.
+  try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f4f6f9; --panel: #ffffff; --panel-2: #eef1f5; --text: #17202b; --muted: #5d6b7c;
+  --line: #dde3ea; --accent: #0f6fb8; --accent-soft: #e2effa; --win: #1d8a4e; --win-soft: #e1f4e9;
+  --loss: #c2372f; --loss-soft: #fbe6e4; --draw: #8a6d1d; --gold: #b7791f; --special: #c4581c; --ci-plain: brightness(.3); --ci-color: drop-shadow(0 0 1px rgba(0,0,0,.55)); --shadow: 0 1px 2px rgba(20,30,50,.06), 0 4px 16px rgba(20,30,50,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1219; --panel: #151c26; --panel-2: #1c2531; --text: #e6ebf1; --muted: #8e9bab;
+    --line: #26313f; --accent: #5fb0f0; --accent-soft: #16304a; --win: #4cc684; --win-soft: #16301f;
+    --loss: #f07166; --loss-soft: #3a1b19; --draw: #d9b453; --gold: #e0a93e; --special: #f08a4b; --ci-plain: none; --ci-color: none; --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1219; --panel: #151c26; --panel-2: #1c2531; --text: #e6ebf1; --muted: #8e9bab;
+  --line: #26313f; --accent: #5fb0f0; --accent-soft: #16304a; --win: #4cc684; --win-soft: #16301f;
+  --loss: #f07166; --loss-soft: #3a1b19; --draw: #d9b453; --gold: #e0a93e; --special: #f08a4b; --ci-plain: none; --ci-color: none; --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 Inter, system-ui, sans-serif; }
+.wrap { padding: 20px 24px 60px; }
+@media (max-width: 640px) { .wrap { padding: 16px 16px 60px; } }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--muted); font-weight: 500; }
+.spacer { flex: 1; }
+button, select, input { font: inherit; color: inherit; }
+.btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+.btn:disabled { opacity: .5; cursor: default; }
+.status { color: var(--muted); font-size: 13px; }
+.progress { height: 4px; background: var(--panel-2); border-radius: 4px; overflow: hidden; width: 220px; display: none; }
+.progress div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); }
+.card.click { cursor: pointer; }
+.card.click:hover { border-color: var(--accent); }
+.card .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.card .val { font: 600 22px/1.2 'JetBrains Mono', monospace; margin-top: 4px; }
+.card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+.filters input, .filters select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.filters input[type=search] { min-width: 220px; flex: 1; max-width: 340px; }
+.minxp { color: var(--muted); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.minxp input { width: 100px; }
+.tablewrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 7px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { position: sticky; top: 0; background: var(--panel-2); font-size: 12px; color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+th.num, td.num { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+th.sorted { color: var(--accent); }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--accent-soft); }
+tr.sel { background: var(--accent-soft); }
+.rank { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.rank.top { color: var(--gold); font-weight: 700; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill.W { background: var(--win-soft); color: var(--win); }
+.pill.L { background: var(--loss-soft); color: var(--loss); }
+.pill.D { background: var(--panel-2); color: var(--draw); }
+.pill.N { background: var(--panel-2); color: var(--muted); }
+.ship { font-weight: 600; }
+.muted { color: var(--muted); }
+.dead { color: var(--loss); }
+.more { text-align: center; padding: 12px; }
+.empty { padding: 50px 20px; text-align: center; color: var(--muted); }
+.empty h2 { color: var(--text); font-size: 18px; margin: 0 0 8px; }
+/* detail drawer */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(940px, 100vw); background: var(--bg); border-left: 1px solid var(--line); z-index: 11; overflow-y: auto; transform: translateX(100%); transition: transform .2s; padding: 18px 16px 40px; }
+.drawer.open { transform: none; }
+.overlay.open { display: block; }
+.drawer h2 { margin: 0 0 4px; font-size: 20px; }
+.drawer .close { float: right; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 14px 0; }
+.kv div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.kv b { display: block; font: 600 16px 'JetBrains Mono', monospace; }
+.kv div > span { color: var(--muted); font-size: 12px; }
+.teams { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.team h3 { margin: 10px 0 6px; font-size: 14px; }
+.team table td, .team table th { padding: 5px 8px; font-size: 13px; }
+tr.me td { background: var(--accent-soft); font-weight: 600; }
+/* ship class icons and flags from the game */
+.ci { width: 22px; height: 22px; vertical-align: middle; margin: -4px 4px -4px 0; filter: var(--ci-color); }
+.ci.t { filter: var(--ci-plain); }
+.flag { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; margin: -6px 5px -6px 0; }
+.shipcell .tier { display: inline-block; min-width: 2.2em; }
+h2.shipcell .ci { width: 28px; height: 28px; }
+h2.shipcell .flag { width: 34px; height: 34px; }
+.kind-p { color: var(--gold); }
+.kind-s { color: var(--special); }
+.first { color: var(--gold); font-weight: 700; }
+.mm { font-weight: 700; letter-spacing: -.1em; }
+.card.wide { grid-column: span 2; }
+.pct.down { color: var(--loss); } .pct.up { color: var(--win); }
+.pr { font-weight: 700; }
+.prchip { display: inline-block; padding: 0 7px; border-radius: 4px; color: #fff; font: 600 12px Inter, system-ui, sans-serif; vertical-align: middle; }
+.card .unit { font: 500 13px Inter, system-ui, sans-serif; color: var(--muted); }
+.mmbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0 6px; background: var(--panel-2); gap: 2px; }
+.mmbar span { display: block; height: 100%; }
+.mmbar .s-2 { background: var(--loss); } .mmbar .s-1 { background: color-mix(in srgb, var(--loss) 55%, transparent); }
+.mmbar .s0 { background: var(--muted); } .mmbar .s1 { background: color-mix(in srgb, var(--win) 55%, transparent); } .mmbar .s2 { background: var(--win); }
+@media (max-width: 640px) { .card.wide { grid-column: auto; } }
+.mm.up { color: var(--win); }
+.mm.down { color: var(--loss); }
+.mm.even { color: var(--muted); }
+.podium { font-weight: 700; }
+/* highlighted players: own clan, friendly clans, known players */
+.tag { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 12px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+.tag.clan { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.tag.friend { color: var(--win); background: color-mix(in srgb, var(--win) 16%, transparent); }
+.tag.player { color: var(--gold); background: color-mix(in srgb, var(--gold) 18%, transparent); }
+.tag.more { color: var(--muted); background: var(--panel-2); }
+tr.hl-clan td:first-child { box-shadow: inset 3px 0 var(--accent); }
+tr.hl-friend td:first-child { box-shadow: inset 3px 0 var(--win); }
+tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+.file { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+.note { color: var(--muted); font-size: 12px; margin-top: 16px; }
+@media (max-width: 640px) { .filters input[type=search] { min-width: 0; max-width: none; width: 100%; } .progress { width: 120px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚓ Replay Results <span id="who"></span></h1>
+    <div class="spacer"></div>
+    <div class="progress" id="progress"><div></div></div>
+    <span class="status" id="status"></span>
+    <button class="btn ghost" id="theme" title="Switch between system, light and dark theme"></button>
+    <button class="btn ghost" id="rescan" hidden>Rescan</button>
+    <button class="btn" id="pick">Select replays folder</button>
+    <input type="file" id="dirinput" webkitdirectory multiple hidden>
+  </header>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="filters" id="filters" hidden>
+    <input type="search" id="q" placeholder="Search ship, map, player…">
+    <select id="mode"><option value="">All battle types</option></select>
+    <select id="cls"><option value="">All ship types</option></select>
+    <select id="kind">
+      <option value="">All ships</option><option value="t">Tech tree ships</option><option value="ps">Premium &amp; special ships</option><option value="p">Premium ships</option><option value="s">Special ships</option>
+    </select>
+    <select id="res">
+      <option value="">All results</option><option value="W">Victories only</option><option value="L">Defeats only</option><option value="D">Draws</option><option value="N">No results</option>
+    </select>
+    <select id="period">
+      <option value="">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option>
+    </select>
+    <select id="mm">
+      <option value="">All matchmaking</option><option value="-2">↓↓ Double uptiered</option><option value="-1">↓ Uptiered</option><option value="down">↓ / ↓↓ Any uptier</option><option value="0">= Same tier</option><option value="1">↑ Top tier, 1 below</option><option value="2">↑↑ Top tier, 2 below</option><option value="top">= / ↑ / ↑↑ Top tier</option>
+    </select>
+    <select id="known">
+      <option value="">All players</option><option value="any">With notable players</option><option value="clan">With clanmates</option><option value="friend">With friendly clans</option><option value="player">With known players</option>
+    </select>
+    <label class="minxp">Base XP ≥ <input type="number" id="minxp" min="0" step="100" placeholder="0"></label>
+    <button class="btn ghost" id="reset">Reset</button>
+    <span class="status" id="count"></span>
+  </div>
+
+  <div class="tablewrap" id="tablewrap">
+    <div class="empty" id="empty">
+      <h2>Select your replays folder</h2>
+      Click <b>Select replays folder</b> and choose <code>E:\Games\World_of_Warships\replays</code>.<br>
+      Files are only read locally in your browser. Results are remembered, so next time only new replays are read.
+    </div>
+    <table id="table" hidden><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+    <div class="more" id="more" hidden><button class="btn ghost" id="morebtn">Show more</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer"></aside>
+
+<!-- Parser: runs both on the page and inside the worker pool, so it must not touch the DOM. -->
+<!-- Ship data extracted from the game (optional; regenerate with update_ships.py). -->
+<script src="ships.js"></script>
+<!-- WoWS Numbers expected values for Personal Rating (optional; same script updates it). -->
+<script src="expected.js"></script>
+<!-- Your own clans and players to highlight (optional, local only; see highlight.example.js). -->
+<script src="highlight.js"></script>
+
+<script id="core">
+/*BF_INIT*/
+const PARSER_VERSION = 3;
+const WOWS_KEY = [0x29,0xB7,0xC9,0x09,0x38,0x3F,0x84,0x88,0xFA,0x98,0xEC,0x4E,0x13,0x19,0x79,0xFB];
+
+function makeBlowfish(key) {
+  const P = BF_INIT.slice(0, 18);
+  const S0 = BF_INIT.slice(18, 274), S1 = BF_INIT.slice(274, 530), S2 = BF_INIT.slice(530, 786), S3 = BF_INIT.slice(786, 1042);
+  const F = x => (((S0[x >>> 24] + S1[(x >>> 16) & 255]) ^ S2[(x >>> 8) & 255]) + S3[x & 255]) >>> 0;
+  const out = [0, 0];
+  function enc(l, r) {
+    for (let i = 0; i < 16; i += 2) {
+      l ^= P[i]; r ^= F(l >>> 0);
+      r ^= P[i + 1]; l ^= F(r >>> 0);
+    }
+    out[0] = (r ^ P[17]) >>> 0; out[1] = (l ^ P[16]) >>> 0;
+  }
+  function dec(l, r) {
+    for (let i = 17; i > 1; i -= 2) {
+      l ^= P[i]; r ^= F(l >>> 0);
+      r ^= P[i - 1]; l ^= F(r >>> 0);
+    }
+    out[0] = (r ^ P[0]) >>> 0; out[1] = (l ^ P[1]) >>> 0;
+  }
+  let k = 0;
+  for (let i = 0; i < 18; i++) {
+    let d = 0;
+    for (let j = 0; j < 4; j++) { d = ((d << 8) | key[k]) >>> 0; k = (k + 1) % key.length; }
+    P[i] = (P[i] ^ d) >>> 0;
+  }
+  let l = 0, r = 0;
+  for (let i = 0; i < 18; i += 2) { enc(l, r); l = P[i] = out[0]; r = P[i + 1] = out[1]; }
+  for (const S of [S0, S1, S2, S3]) for (let i = 0; i < 256; i += 2) { enc(l, r); l = S[i] = out[0]; r = S[i + 1] = out[1]; }
+  return { dec, out };
+}
+
+let blowfish = null;
+
+// Blowfish-ECB where every decrypted block is also XORed with the previous plaintext block.
+function decryptStream(bytes) {
+  blowfish ||= makeBlowfish(WOWS_KEY);
+  const { dec, out: o } = blowfish;
+  const n = bytes.length & ~7;
+  const inV = new DataView(bytes.buffer, bytes.byteOffset, n);
+  const res = new Uint8Array(n);
+  const outV = new DataView(res.buffer);
+  let pl = 0, pr = 0;
+  for (let i = 0; i < n; i += 8) {
+    dec(inV.getUint32(i), inV.getUint32(i + 4));
+    let l = o[0], r = o[1];
+    if (i > 0) { l = (l ^ pl) >>> 0; r = (r ^ pr) >>> 0; }
+    pl = l; pr = r;
+    outV.setUint32(i, l); outV.setUint32(i + 4, r);
+  }
+  return res;
+}
+
+// The decrypted stream is zero-padded to a multiple of 8 bytes, and DecompressionStream
+// rejects trailing junk. Cut the zeros; since the Adler-32 trailer can itself end in zero
+// bytes, put them back one at a time until the stream checks out.
+async function inflate(bytes, size) {
+  let end = bytes.length;
+  while (end > bytes.length - 8 && bytes[end - 1] === 0) end--;
+  let lastErr;
+  for (; end <= bytes.length; end++) {
+    try {
+      const stream = new Blob([bytes.subarray(0, end)]).stream().pipeThrough(new DecompressionStream('deflate'));
+      const out = new Uint8Array(await new Response(stream).arrayBuffer());
+      if (out.length === size) return out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Could not decompress the replay');
+}
+
+// Column of the (premium) XP in a playersPublicInfo row, per row length.
+// Everything else we read sits at a fixed offset from it; see parseReplay.
+const XP_INDEX = { 498: 402, 500: 404, 503: 404, 506: 407, 538: 404 };
+
+function findXpIndex(row, xp) {
+  const known = XP_INDEX[row.length];
+  if (known !== undefined && row[known] === xp) return known;
+  for (let i = row.length - 90; i >= row.length - 140; i--) {
+    if (row[i] === xp && typeof row[i + 22] === 'number') return i;
+  }
+  return -1;
+}
+
+async function parseReplay(buf) {
+  const td = new TextDecoder();
+  const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (v.getUint32(0, true) !== 0x11343212) throw new Error('Not a WoWS replay');
+  const blocks = v.getUint32(4, true);
+  let o = 8, meta = null;
+  for (let i = 0; i < blocks; i++) {
+    const len = v.getUint32(o, true); o += 4;
+    if (i === 0) meta = JSON.parse(td.decode(buf.subarray(o, o + len)));
+    o += len;
+  }
+  const out = {
+    ship: meta.playerVehicle, player: meta.playerName, map: meta.mapDisplayName, mode: meta.gameType,
+    group: meta.matchGroup, scenario: meta.scenario, version: (meta.clientVersionFromExe || '').split(',').slice(0, 3).join('.'),
+    dateTime: meta.dateTime, result: null,
+  };
+
+  const size = v.getUint32(o, true);
+  const data = await inflate(decryptStream(buf.subarray(o + 8)), size);
+  const pv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let p = 0, res = null;
+  while (p + 12 <= data.length) {
+    const len = pv.getUint32(p, true), type = pv.getUint32(p + 4, true);
+    if (type === 0x22) res = [p + 12, len];  // battle results, JSON prefixed with its length
+    p += 12 + len;
+  }
+  if (!res) return out;
+  const r = JSON.parse(td.decode(data.subarray(res[0] + 4, res[0] + res[1])));
+  const me = r.playersPublicInfo[r.accountDBID];
+  const priv = r.privateDataList;
+  const econ = Array.isArray(priv?.[7]) ? priv[7] : null;
+  if (!me || !econ) return out;
+  const x = findXpIndex(me, econ[3]);
+  if (x < 0) return out;
+
+  const winner = r.commonList[3];
+  const num = n => (typeof n === 'number' ? Math.round(n) : 0);
+  const players = Object.values(r.playersPublicInfo).map(row => [
+    row[1], row[3] || '', row[6], row[7], num(row[x + 22]), num(row[26]), num(row[x]), row[21] ? 1 : 0, row[0] === me[0] ? 1 : 0, num(row[x - 1]),
+  ]);
+  out.result = {
+    win: winner === -1 ? 'D' : winner === me[6] ? 'W' : 'L',
+    shipId: me[7], dmg: num(me[x + 22]), xp: num(econ[3]), baseXp: num(me[x - 1]), credits: num(econ[0]),
+    kills: num(me[26]), spot: num(me[x + 8]), potential: num(me[x + 12]),
+    alive: !!me[21], hp: num(me[20]), maxHp: num(me[15]), lifetime: num(me[22]), duration: num(r.commonList[8]),
+    distance: typeof me[23] === 'number' ? Math.round(me[23] * 10) / 10 : 0,
+    start: r.commonList[2], team: me[6], players,
+  };
+  return out;
+}
+</script>
+
+<script>
+const $ = s => document.querySelector(s);
+
+// Theme: follows the system until the user picks light or dark; cycles system → light → dark.
+const THEMES = { '': '◐ System', light: '☀ Light', dark: '☾ Dark' };
+function showTheme() { $('#theme').textContent = THEMES[document.documentElement.dataset.theme || '']; }
+$('#theme').onclick = () => {
+  const order = ['', 'light', 'dark'];
+  const next = order[(order.indexOf(document.documentElement.dataset.theme || '') + 1) % 3];
+  if (next) document.documentElement.dataset.theme = next;
+  else delete document.documentElement.dataset.theme;
+  try { next ? localStorage.setItem('theme', next) : localStorage.removeItem('theme'); } catch {}
+  showTheme();
+};
+showTheme();
+const nf = new Intl.NumberFormat('en-US');
+const fmt = n => (n == null ? '–' : nf.format(n));
+
+const NATIONS = { A: 'U.S.A.', B: 'U.K.', F: 'France', G: 'Germany', I: 'Italy', J: 'Japan', R: 'U.S.S.R.', V: 'Pan-America', W: 'Europe', Z: 'Pan-Asia', U: 'Commonwealth', H: 'The Netherlands', S: 'Spain', X: 'Events' };
+const CLASSES = { A: 'Aircraft Carrier', B: 'Battleship', C: 'Cruiser', D: 'Destroyer', S: 'Submarine' };
+const MODES = { RandomBattle: 'Random Battle', RankedBattle: 'Ranked Battle', CooperativeBattle: 'Co-op Battle', EventBattle: 'Event', PVE: 'Operation', ClanBattle: 'Clan Battle', BrawlBattle: 'Brawl', PVPVE: 'Operation', PVEBattle: 'Scenario', PVE_PREMADE: 'Operation', TrainingBattle: 'Training Room' };
+
+// Ship names, tiers and bot names extracted from the game by update_ships.py (ships.js).
+const GAME = window.GAME_DATA || { ships: {}, names: {} };
+const SPECIES = { Destroyer: 'Destroyer', Cruiser: 'Cruiser', Battleship: 'Battleship', AirCarrier: 'Aircraft Carrier', Submarine: 'Submarine', Auxiliary: 'Auxiliary' };
+const GAME_NATIONS = { USA: 'U.S.A.', United_Kingdom: 'U.K.', Russia: 'U.S.S.R.', Pan_Asia: 'Pan-Asia', Pan_America: 'Pan-America', Netherlands: 'The Netherlands' };
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', '★'];
+const shipsByIndex = {};
+for (const s of Object.values(GAME.ships)) shipsByIndex[s[4]] = s;
+
+const KINDS = { t: 'Tech tree ship', p: 'Premium ship', s: 'Special ship' };
+const fromGame = s => s && {
+  name: s[0], tier: s[1], cls: SPECIES[s[2]] || s[2], nation: GAME_NATIONS[s[3]] || s[3],
+  species: String(s[2]).toLowerCase(), kind: s[5] || 't', flag: s[6] || '',
+};
+
+// Class icon as in the port carousel: white for tech tree, gold for premium, special for special ships.
+function classIcon(s) {
+  if (!s?.species) return '';
+  const variant = s.kind === 'p' ? '_premium' : s.kind === 's' && s.species !== 'auxiliary' ? '_special' : '';
+  return `<img class="ci ${s.kind}" src="assets/class/${s.species}${variant}.png" alt="" title="${esc(s.cls)} · ${KINDS[s.kind]}">`;
+}
+const flagIcon = s => (s?.flag ? `<img class="flag" src="assets/flags/${encodeURIComponent(s.flag)}.png" alt="" title="${esc(s.nation)}">` : '');
+const shipById = id => fromGame(GAME.ships[id]);
+const botName = name => GAME.names[name] || name;
+const tierText = t => ROMAN[t] || '';
+
+// `index` is the replay's ship, e.g. "PGSB930-Pinata-Schliefen"; falls back to decoding it when ships.js is missing.
+function shipInfo(index) {
+  const known = fromGame(shipsByIndex[(index || '').split('-')[0]]);
+  if (known) return known;
+  const m = /^P(.)S(.)[^-]*-(.+)$/.exec(index || '');
+  if (!m) return { name: index || '?', nation: '', cls: '', tier: null, kind: null };
+  return { name: m[3].replace(/-/g, ' '), nation: NATIONS[m[1]] || m[1], cls: CLASSES[m[2]] || m[2], tier: null, kind: null };
+}
+const mapName = s => (s || '').replace(/^[a-z]?\d+_/i, '').replace(/_/g, ' ');
+const modeName = s => MODES[s] || s || '?';
+
+function dateFromFile(name, fallback) {
+  const m = /^(\d{4})(\d\d)(\d\d)_(\d\d)(\d\d)(\d\d)/.exec(name);
+  if (m) return new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+  const f = /^(\d\d)\.(\d\d)\.(\d{4}) (\d\d):(\d\d):(\d\d)$/.exec(fallback || '');
+  if (f) return new Date(+f[3], f[2] - 1, +f[1], +f[4], +f[5], +f[6]).getTime();
+  return 0;
+}
+const fmtDate = t => t ? new Date(t).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
+const fmtTime = s => s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '–';
+
+// ---------- IndexedDB cache ----------
+const db = (() => {
+  let p;
+  const open = () => p ||= new Promise((ok, fail) => {
+    const req = indexedDB.open('wows-replays', 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore('replays', { keyPath: 'key' });
+      req.result.createObjectStore('settings');
+    };
+    req.onsuccess = () => ok(req.result);
+    req.onerror = () => fail(req.error);
+  });
+  const run = async (store, mode, fn) => {
+    const d = await open();
+    return new Promise((ok, fail) => {
+      const tx = d.transaction(store, mode);
+      const r = fn(tx.objectStore(store));
+      tx.oncomplete = () => ok(r?.result);
+      tx.onerror = () => fail(tx.error);
+    });
+  };
+  return {
+    all: () => run('replays', 'readonly', s => s.getAll()),
+    putMany: rows => run('replays', 'readwrite', s => { rows.forEach(r => s.put(r)); }),
+    del: keys => run('replays', 'readwrite', s => { keys.forEach(k => s.delete(k)); }),
+    get: k => run('settings', 'readonly', s => s.get(k)),
+    set: (k, v) => run('settings', 'readwrite', s => s.put(v, k)),
+  };
+})();
+
+// ---------- worker pool ----------
+function makePool() {
+  const n = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+  let workers = [];
+  try {
+    const src = $('#core').textContent + `
+      self.onmessage = async e => {
+        const { id, file } = e.data;
+        try { self.postMessage({ id, ok: await parseReplay(new Uint8Array(await file.arrayBuffer())) }); }
+        catch (err) { self.postMessage({ id, err: String(err && err.message || err) }); }
+      };`;
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    for (let i = 0; i < n; i++) workers.push(new Worker(url));
+  } catch { workers = []; }
+
+  // Falls back to parsing on the page if workers are unavailable (e.g. blocked on file://).
+  async function onPage(file) {
+    return parseReplay(new Uint8Array(await file.arrayBuffer()));
+  }
+  let seq = 0;
+  const pending = new Map();
+  workers.forEach(w => {
+    w.onmessage = e => {
+      const cb = pending.get(e.data.id); pending.delete(e.data.id);
+      e.data.err ? cb.fail(new Error(e.data.err)) : cb.ok(e.data.ok);
+    };
+  });
+  let broken = workers.length === 0;
+  async function parse(file, wi) {
+    if (broken) return onPage(file);
+    const id = ++seq;
+    try {
+      return await new Promise((ok, fail) => {
+        pending.set(id, { ok, fail });
+        const w = workers[wi % workers.length];
+        w.onerror = ev => { ev.preventDefault(); broken = true; fail(new Error('worker')); };
+        w.postMessage({ id, file });
+      });
+    } catch (e) {
+      if (broken) return onPage(file);
+      throw e;
+    }
+  }
+  return { size: Math.max(1, workers.length), parse };
+}
+
+// ---------- notable players ----------
+// Players and clans to point out in battles (streamers, friends, clans). The list is personal,
+// so it lives in highlight.js next to the page (not in the repository); see highlight.example.js.
+const HIGHLIGHT = { self_name: '', own_clan: '', friendly_clans: [], known_players: [], case_insensitive: true, ...(window.HIGHLIGHT || {}) };
+const TAGS = { player: 'Known player', clan: 'Clanmate', friend: 'Friendly clan' };
+const hl = (() => {
+  const norm = s => (HIGHLIGHT.case_insensitive ? String(s ?? '').toLowerCase() : String(s ?? ''));
+  return {
+    norm, self: norm(HIGHLIGHT.self_name), own: norm(HIGHLIGHT.own_clan),
+    clans: new Set(HIGHLIGHT.friendly_clans.map(norm)), players: new Set(HIGHLIGHT.known_players.map(norm)),
+  };
+})();
+
+// p = [name, clan, team, shipId, damage, destroyed, xp, alive, isMe, baseXp]
+function tagOf(p) {
+  if (p[8] || hl.norm(p[0]) === hl.self) return null;
+  if (hl.players.has(hl.norm(p[0]))) return 'player';
+  if (p[1] && hl.norm(p[1]) === hl.own) return 'clan';
+  if (p[1] && hl.clans.has(hl.norm(p[1]))) return 'friend';
+  return null;
+}
+const playerLabel = p => `${p[1] ? `[${p[1]}] ` : ''}${botName(p[0])}`;
+
+// ---------- state ----------
+let rows = [];          // flattened, one per replay
+let dirHandle = null;
+let shipNames = {};     // shipId -> ship index, learned from own battles
+const view = { sort: 'date', dir: -1, limit: 200 };
+
+// The post-battle team list ranks players by base XP; older cached records lack it, so fall back to XP.
+const baseXpOf = p => p[9] ?? p[6];
+function teamOrder(players, team) {
+  return players.filter(p => p[2] === team).sort((a, b) => baseXpOf(b) - baseXpOf(a) || b[4] - a[4]);
+}
+
+function toRow(rec) {
+  const r = rec.result;
+  const s = (r && shipById(r.shipId)) || shipInfo(rec.ship);
+  const team = r ? teamOrder(r.players, r.team) : [];
+  const place = r ? team.findIndex(p => p[8]) + 1 || null : null;
+  const mm = r ? matchmaking(r, s.tier) : null;
+  const notable = r ? r.players.map(p => ({ p, tag: tagOf(p) })).filter(x => x.tag) : [];
+  const order = { player: 0, clan: 1, friend: 2 };
+  notable.sort((a, b) => order[a.tag] - order[b.tag] || (b.p[2] === r.team) - (a.p[2] === r.team));
+  return {
+    notable, notableCount: r ? notable.length : null,
+    key: rec.key, file: rec.file, rec, date: dateFromFile(rec.file, rec.dateTime),
+    ship: s, place, teamSize: team.length, kind: s.kind, mm, pr: battlePR(rec),
+    shipName: s.name, tier: s.tier || null, nation: s.nation, cls: s.cls, map: mapName(rec.map), mode: modeName(rec.mode),
+    win: r ? r.win : 'N', dmg: r?.dmg ?? null, xp: r?.xp ?? null, baseXp: r?.baseXp ?? null, kills: r?.kills ?? null,
+    spot: r?.spot ?? null, potential: r?.potential ?? null, credits: r?.credits ?? null,
+    alive: r ? r.alive : null, lifetime: r?.lifetime ?? null, player: rec.player,
+    search: `${s.name} ${mapName(rec.map)} ${modeName(rec.mode)} ${rec.file} ${r ? r.players.map(playerLabel).join(' ') : ''}`.toLowerCase(),
+  };
+}
+
+function otherShip(id) {
+  const s = shipById(id) || (shipNames[id] && shipInfo(shipNames[id]));
+  if (!s) return '<span class="muted">–</span>';
+  return `<span class="shipcell">${flagIcon(s)}${classIcon(s)}<span class="muted tier">${tierText(s.tier)}</span> <span class="kind-${s.kind}">${esc(s.name)}</span></span>`;
+}
+
+function learnShips(recs) {
+  for (const rec of recs) if (rec.result?.shipId) shipNames[rec.result.shipId] = rec.ship;
+}
+
+// ---------- scanning ----------
+async function* walk(dir, path = '') {
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind === 'directory') yield* walk(h, path + name + '/');
+    else if (name.toLowerCase().endsWith('.wowsreplay') && name !== 'temp.wowsreplay') yield { name: path + name, handle: h };
+  }
+}
+
+async function filesFromHandle(dir) {
+  const files = [];
+  for await (const e of walk(dir)) files.push({ name: e.name, file: await e.handle.getFile() });
+  return files;
+}
+
+let scanning = false;
+async function processFiles(entries) {
+  if (scanning) return;
+  scanning = true;
+  $('#pick').disabled = $('#rescan').disabled = true;
+  try {
+    const cached = await db.all();
+    const byKey = new Map(cached.map(c => [c.key, c]));
+    const keyOf = e => `${PARSER_VERSION}|${e.name}|${e.file.size}|${e.file.lastModified}`;
+    const wanted = new Set(entries.map(keyOf));
+    const todo = entries.filter(e => !byKey.has(keyOf(e)));
+    const stale = cached.filter(c => !wanted.has(c.key)).map(c => c.key);
+    if (stale.length) await db.del(stale);
+
+    const recs = cached.filter(c => wanted.has(c.key));
+    learnShips(recs);
+    rows = recs.map(toRow);
+    render();
+
+    if (todo.length) {
+      const pool = makePool();
+      let done = 0, failed = 0, batch = [];
+      const bar = $('#progress'), fill = bar.firstElementChild;
+      bar.style.display = 'block';
+      const tick = () => {
+        fill.style.width = `${(done / todo.length) * 100}%`;
+        $('#status').textContent = `Reading replays… ${nf.format(done)} / ${nf.format(todo.length)}`;
+      };
+      tick();
+      let lastRender = performance.now();
+      let next = 0;
+      async function lane(wi) {
+        while (next < todo.length) {
+          const e = todo[next++];
+          let rec;
+          try {
+            rec = await pool.parse(e.file, wi);
+          } catch (err) {
+            failed++;
+            rec = { error: String(err.message || err) };
+          }
+          rec.key = keyOf(e); rec.file = e.name;
+          batch.push(rec);
+          if (!rec.error) { learnShips([rec]); rows.push(toRow(rec)); }
+          done++;
+          tick();
+          if (batch.length >= 50) { const b = batch; batch = []; db.putMany(b).catch(() => {}); }
+          if (performance.now() - lastRender > 1500) { lastRender = performance.now(); render(); }
+        }
+      }
+      await Promise.all(Array.from({ length: pool.size }, (_, i) => lane(i)));
+      if (batch.length) await db.putMany(batch).catch(() => {});
+      bar.style.display = 'none';
+      $('#status').textContent = failed ? `${nf.format(failed)} files could not be read` : '';
+    }
+    rows = rows.filter(r => !r.rec.error);
+    render();
+  } finally {
+    scanning = false;
+    $('#pick').disabled = $('#rescan').disabled = false;
+  }
+}
+
+async function scanHandle() {
+  $('#status').textContent = 'Finding files…';
+  const entries = await filesFromHandle(dirHandle);
+  $('#rescan').hidden = false;
+  $('#pick').textContent = 'Change folder';
+  await processFiles(entries);
+}
+
+$('#pick').onclick = async () => {
+  if (window.showDirectoryPicker) {
+    try {
+      dirHandle = await showDirectoryPicker({ id: 'wows-replays', mode: 'read' });
+    } catch { return; }
+    db.set('dir', dirHandle).catch(() => {});
+    scanHandle();
+  } else {
+    $('#dirinput').click();
+  }
+};
+$('#dirinput').onchange = e => {
+  const files = [...e.target.files].filter(f => f.name.toLowerCase().endsWith('.wowsreplay') && f.name !== 'temp.wowsreplay');
+  processFiles(files.map(f => ({ name: f.webkitRelativePath.split('/').slice(1).join('/') || f.name, file: f })));
+};
+$('#rescan').onclick = async () => {
+  if (!dirHandle) return $('#pick').click();
+  if ((await dirHandle.requestPermission({ mode: 'read' })) === 'granted') scanHandle();
+};
+
+// ---------- rendering ----------
+const COLS = [
+  { k: 'rank', t: '#', cls: '' },
+  { k: 'date', t: 'Date' },
+  { k: 'tier', t: 'Tier', num: 1 },
+  { k: 'mm', t: 'MM', num: 1 },
+  { k: 'shipName', t: 'Ship' },
+  { k: 'cls', t: 'Type' },
+  { k: 'map', t: 'Map' },
+  { k: 'mode', t: 'Battle type' },
+  { k: 'win', t: 'Result' },
+  { k: 'pr', t: 'PR', num: 1 },
+  { k: 'place', t: 'Team place', num: 1 },
+  { k: 'notableCount', t: 'Notable players' },
+  { k: 'dmg', t: 'Damage', num: 1 },
+  { k: 'xp', t: 'XP', num: 1 },
+  { k: 'baseXp', t: 'Base XP', num: 1 },
+  { k: 'kills', t: 'Destroyed', num: 1 },
+  { k: 'spot', t: 'Spotting dmg', num: 1 },
+  { k: 'potential', t: 'Potential dmg', num: 1 },
+  { k: 'credits', t: 'Credits', num: 1 },
+  { k: 'lifetime', t: 'Survival', num: 1 },
+];
+
+function filtered() {
+  const q = $('#q').value.trim().toLowerCase();
+  const mode = $('#mode').value, cls = $('#cls').value, kind = $('#kind').value, res = $('#res').value, period = +$('#period').value;
+  const since = period ? Date.now() - period * 864e5 : 0;
+  const minXp = +$('#minxp').value || 0;
+  const known = $('#known').value, mmf = $('#mm').value;
+  return rows.filter(r =>
+    (!known || r.notable.some(x => known === 'any' || x.tag === known)) &&
+    (!mmf || (r.mm != null && (mmf === 'down' ? r.mm < 0 : mmf === 'top' ? r.mm >= 0 : r.mm === +mmf))) &&
+    (!q || q.split(/\s+/).every(w => r.search.includes(w))) &&
+    (!mode || r.mode === mode) && (!cls || r.cls === cls) && (!kind || kind.includes(r.kind)) &&
+    (!res || r.win === res) &&
+    (!minXp || (r.baseXp ?? 0) >= minXp) &&
+    (!since || r.date >= since));
+}
+
+function sortRows(list) {
+  const { sort, dir } = view;
+  return list.slice().sort((a, b) => {
+    const x = a[sort], y = b[sort];
+    if (x == null && y == null) return b.date - a.date;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    const c = typeof x === 'string' ? x.localeCompare(y, 'en') : x - y;
+    return c * dir || b.date - a.date;
+  });
+}
+
+function fillSelect(sel, values) {
+  const cur = sel.value;
+  const first = sel.options[0].outerHTML;
+  sel.innerHTML = first + [...values].sort((a, b) => a.localeCompare(b, 'en')).map(v => `<option>${esc(v)}</option>`).join('');
+  sel.value = cur;
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function render() {
+  const has = rows.length > 0;
+  $('#empty').hidden = has;
+  $('#table').hidden = !has;
+  $('#filters').hidden = !has;
+  if (!has) { $('#cards').innerHTML = ''; return; }
+  const me = rows.find(r => r.player)?.player;
+  $('#who').textContent = me ? `– ${me}` : '';
+  fillSelect($('#mode'), new Set(rows.map(r => r.mode)));
+  fillSelect($('#cls'), new Set(rows.map(r => r.cls).filter(Boolean)));
+
+  const list = filtered();
+  renderCards(list);
+  const sorted = sortRows(list);
+  const numericSort = COLS.find(c => c.k === view.sort)?.num;
+
+  $('#thead').innerHTML = COLS.map(c =>
+    `<th data-k="${c.k}" class="${c.num ? 'num' : ''} ${view.sort === c.k ? 'sorted' : ''}">${c.t}${view.sort === c.k ? (view.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
+  const shown = sorted.slice(0, view.limit);
+  $('#tbody').innerHTML = shown.map((r, i) => {
+    const pill = { W: 'Victory', L: 'Defeat', D: 'Draw', N: 'No data' }[r.win];
+    return `<tr data-key="${esc(r.key)}">
+      <td class="rank ${numericSort && i < 3 ? 'top' : ''}">${i + 1}</td>
+      <td>${fmtDate(r.date)}</td>
+      <td class="num muted">${tierText(r.tier)}</td>
+      <td class="num">${mmText(r.mm)}</td>
+      <td class="ship">${flagIcon(r.ship)}<span class="kind-${r.kind}" title="${esc(KINDS[r.kind] || '')}">${esc(r.shipName)}</span></td>
+      <td class="muted">${classIcon(r.ship)}${esc(r.cls)}</td>
+      <td>${esc(r.map)}</td>
+      <td class="muted">${esc(r.mode)}</td>
+      <td><span class="pill ${r.win}">${pill}</span></td>
+      <td class="num">${prText(r.pr)}</td>
+      <td class="num">${placeText(r)}</td>
+      <td>${notableChips(r.notable)}</td>
+      <td class="num">${fmt(r.dmg)}</td>
+      <td class="num">${fmt(r.xp)}</td>
+      <td class="num">${fmt(r.baseXp)}</td>
+      <td class="num">${fmt(r.kills)}</td>
+      <td class="num">${fmt(r.spot)}</td>
+      <td class="num">${fmt(r.potential)}</td>
+      <td class="num">${fmt(r.credits)}</td>
+      <td class="num ${r.alive === false ? 'dead' : ''}">${r.alive == null ? '–' : r.alive ? 'Survived' : fmtTime(r.lifetime)}</td>
+    </tr>`;
+  }).join('');
+  $('#more').hidden = sorted.length <= view.limit;
+  $('#count').textContent = `${nf.format(list.length)} battles${list.length !== rows.length ? ` of ${nf.format(rows.length)}` : ''}`;
+}
+
+// Matchmaking spread for your ship: negative = uptiered (higher tiers in the battle), 0 = everyone
+// the same tier, positive = top tier with lower tiers below you. Ships without a known tier are ignored.
+// Superships (★) count as tier XI, so a tier IX facing them is double uptiered.
+function matchmaking(res, myTier) {
+  if (!myTier) return null;
+  const tiers = res.players.map(p => shipById(p[3])?.tier).filter(Boolean);
+  if (!tiers.length) return null;
+  const max = Math.max(...tiers), min = Math.min(...tiers);
+  return max > myTier ? -Math.min(2, max - myTier) : Math.min(2, myTier - min);
+}
+const MM_TEXT = { '-2': 'Double uptiered (2 tiers above you)', '-1': 'Uptiered (1 tier above you)', 0: 'Same tier for everyone', 1: 'Top tier (1 tier below you)', 2: 'Top tier (2 tiers below you)' };
+function mmText(v) {
+  if (v == null) return '–';
+  const arrows = { '-2': '↓↓', '-1': '↓', 0: '=', 1: '↑', 2: '↑↑' }[v];
+  return `<span class="mm ${v < 0 ? 'down' : v > 0 ? 'up' : 'even'}" title="${MM_TEXT[v]}">${arrows}</span>`;
+}
+
+// ---------- Personal Rating (WoWS Numbers formula) ----------
+const EXPECTED = window.PR_EXPECTED?.data || {};
+const PVP_MODES = new Set(['RandomBattle', 'RankedBattle', 'ClanBattle', 'BrawlBattle']);
+const PR_BANDS = [
+  [0, 'Bad', '#FE0E00'], [750, 'Below Average', '#FE7903'], [1100, 'Average', '#D9A300'], [1350, 'Good', '#44B300'],
+  [1550, 'Very Good', '#318000'], [1750, 'Great', '#02C9B3'], [2100, 'Unicum', '#D042F3'], [2450, 'Super Unicum', '#A00DC5'],
+];
+const prBand = pr => { const b = PR_BANDS.findLast(x => pr >= x[0]) || PR_BANDS[0]; return { name: b[1], color: b[2] }; };
+
+// Ratios of actual to expected damage, frags and wins, normalised and weighted 700/300/150.
+function prFormula(dmg, frags, wins, expDmg, expFrags, expWins) {
+  if (!expDmg || !expFrags || !expWins) return null;
+  const nDmg = Math.max(0, (dmg / expDmg - 0.4) / 0.6);
+  const nFrags = Math.max(0, (frags / expFrags - 0.1) / 0.9);
+  const nWins = Math.max(0, (wins / expWins - 0.7) / 0.3);
+  return Math.round(700 * nDmg + 300 * nFrags + 150 * nWins);
+}
+
+// PR of one player in one battle: p = [name, clan, team, shipId, damage, destroyed, ...].
+function playerPR(rec, p) {
+  const r = rec.result, e = EXPECTED[p[3]];
+  if (!r || !e || !PVP_MODES.has(rec.mode) || p[0].startsWith(':')) return null;
+  const won = r.win === 'D' ? 0 : (r.win === 'W') === (p[2] === r.team) ? 1 : 0;
+  return prFormula(p[4], p[5], won, e[0], e[1], e[2] / 100);
+}
+const battlePR = rec => { const me = rec.result?.players.find(p => p[8]); return me ? playerPR(rec, me) : null; };
+
+function prText(pr) {
+  return pr == null ? '–' : `<span class="pr" style="color:${prBand(pr).color}" title="${prBand(pr).name}">${nf.format(pr)}</span>`;
+}
+
+// Overall PR for a set of battles: totals against expected totals, as WoWS Numbers does per ship.
+function prCard(list) {
+  let dmg = 0, frags = 0, wins = 0, eDmg = 0, eFrags = 0, eWins = 0, n = 0;
+  for (const r of list) {
+    if (r.pr == null) continue;
+    const e = EXPECTED[r.rec.result.shipId];
+    dmg += r.dmg; frags += r.kills; wins += r.win === 'W' ? 1 : 0;
+    eDmg += e[0]; eFrags += e[1]; eWins += e[2] / 100; n++;
+  }
+  if (!n) return '';
+  const pr = prFormula(dmg, frags, wins, eDmg, eFrags, eWins), band = prBand(pr);
+  return `<div class="card"><div class="lbl">Personal Rating</div>
+    <div class="val" style="color:${band.color}">${nf.format(pr)}</div>
+    <div class="sub"><span class="prchip" style="background:${band.color}">${band.name}</span> ${nf.format(n)} PvP battles</div></div>`;
+}
+
+function mmCard(list) {
+  const known = list.filter(r => r.mm != null);
+  if (!known.length) return '';
+  const pct = v => known.filter(r => r.mm === v).length / known.length * 100;
+  const parts = [[-2, '↓↓'], [-1, '↓'], [0, '='], [1, '↑'], [2, '↑↑']].map(([v, a]) => ({ v, a, p: pct(v) }));
+  const uptier = parts[0].p + parts[1].p, downtier = parts[3].p + parts[4].p;
+  const avg = known.reduce((s, r) => s + r.mm, 0) / known.length;
+  return `<div class="card wide"><div class="lbl">Matchmaking</div>
+    <div class="val"><span class="pct down">${uptier.toFixed(0)}%</span> <span class="unit">uptiered</span> &nbsp;<span class="pct up">${downtier.toFixed(0)}%</span> <span class="unit">downtiered</span></div>
+    <div class="mmbar">${parts.map(x => `<span class="s${x.v}" style="width:${x.p}%" title="${MM_TEXT[x.v]}: ${x.p.toFixed(1)}%"></span>`).join('')}</div>
+    <div class="sub">${parts.map(x => `<span class="mm ${x.v < 0 ? 'down' : x.v > 0 ? 'up' : 'even'}">${x.a}</span> ${x.p.toFixed(0)}%`).join(' · ')} · avg ${avg >= 0 ? '+' : ''}${avg.toFixed(2)}</div></div>`;
+}
+
+function placeText(r) {
+  if (!r.place) return '–';
+  return `<span class="${r.place === 1 ? 'first' : r.place <= 3 ? 'podium' : ''}">${r.place}</span><span class="muted"> / ${r.teamSize}</span>`;
+}
+
+function notableChips(notable) {
+  if (!notable.length) return '';
+  const tip = notable.map(x => `${playerLabel(x.p)} – ${TAGS[x.tag]}`).join('\n');
+  const chips = notable.slice(0, 2).map(x => `<span class="tag ${x.tag}">${esc(x.p[0])}</span>`).join('');
+  const more = notable.length > 2 ? `<span class="tag more">+${notable.length - 2}</span>` : '';
+  return `<span title="${esc(tip)}">${chips}${more}</span>`;
+}
+
+function renderCards(list) {
+  const withRes = list.filter(r => r.win !== 'N');
+  const wins = withRes.filter(r => r.win === 'W').length;
+  const avg = k => withRes.length ? Math.round(withRes.reduce((s, r) => s + (r[k] || 0), 0) / withRes.length) : null;
+  const best = k => withRes.reduce((b, r) => (b == null || r[k] > b[k] ? r : b), null);
+  const bd = best('dmg'), bx = best('xp'), bk = best('kills'), bs = best('spot'), bp = best('potential');
+  const placed = withRes.filter(r => r.place);
+  const tops = placed.filter(r => r.place === 1).length;
+  const avgPlace = placed.length ? (placed.reduce((a, r) => a + r.place, 0) / placed.length).toFixed(1) : '–';
+  const sub = r => r ? `${esc(r.shipName)} · ${esc(r.map)}` : '';
+  $('#cards').innerHTML = `
+    <div class="card"><div class="lbl">Battles</div><div class="val">${nf.format(list.length)}</div><div class="sub">${nf.format(withRes.length)} with results</div></div>
+    <div class="card"><div class="lbl">Win rate</div><div class="val">${withRes.length ? (wins / withRes.length * 100).toFixed(1) + '%' : '–'}</div><div class="sub">${nf.format(wins)} victories</div></div>
+    <div class="card"><div class="lbl">Average damage</div><div class="val">${fmt(avg('dmg'))}</div><div class="sub">Average XP ${fmt(avg('xp'))}</div></div>
+    <div class="card click" data-key="${esc(bd?.key)}"><div class="lbl">Most damage</div><div class="val">${fmt(bd?.dmg)}</div><div class="sub">${sub(bd)}</div></div>
+    <div class="card click" data-key="${esc(bx?.key)}"><div class="lbl">Most XP</div><div class="val">${fmt(bx?.xp)}</div><div class="sub">${sub(bx)}</div></div>
+    <div class="card click" data-key="${esc(bk?.key)}"><div class="lbl">Most warships destroyed</div><div class="val">${fmt(bk?.kills)}</div><div class="sub">${sub(bk)}</div></div>
+    <div class="card"><div class="lbl">Average spotting dmg</div><div class="val">${fmt(avg('spot'))}</div><div class="sub">Average potential ${fmt(avg('potential'))}</div></div>
+    <div class="card click" data-key="${esc(bs?.key)}"><div class="lbl">Most spotting dmg</div><div class="val">${fmt(bs?.spot)}</div><div class="sub">${sub(bs)}</div></div>
+    <div class="card click" data-key="${esc(bp?.key)}"><div class="lbl">Most potential dmg</div><div class="val">${fmt(bp?.potential)}</div><div class="sub">${sub(bp)}</div></div>
+    ${prCard(withRes)}
+    ${mmCard(withRes)}
+    <div class="card"><div class="lbl">Top of team</div><div class="val">${nf.format(tops)}</div><div class="sub">Average team place ${avgPlace}</div></div>`;
+}
+
+function openDetail(key) {
+  const r = rows.find(x => x.key === key);
+  if (!r) return;
+  document.querySelectorAll('tr.sel').forEach(t => t.classList.remove('sel'));
+  document.querySelector(`tr[data-key="${CSS.escape(key)}"]`)?.classList.add('sel');
+  const res = r.rec.result;
+  const pill = { W: 'Victory', L: 'Defeat', D: 'Draw', N: 'No results' }[r.win];
+  let body = '';
+  if (res) {
+    const teams = [0, 1].map(t => teamOrder(res.players, t));
+    const teamTable = (list, title) => `
+      <div class="team"><h3>${title}</h3><div class="tablewrap"><table>
+        <thead><tr><th class="num">#</th><th>Player</th><th>Ship</th><th class="num">Damage</th><th class="num">Destroyed</th><th class="num">Base XP</th><th class="num">XP</th><th class="num">PR</th><th></th></tr></thead>
+        <tbody>${list.map((p, i) => { const tag = tagOf(p); return `<tr class="${p[8] ? 'me' : ''} ${tag ? 'hl-' + tag : ''}">
+          <td class="num muted">${i + 1}</td>
+          <td>${p[1] ? `<span class="muted">[${esc(p[1])}]</span> ` : ''}${esc(botName(p[0]))}${tag ? ` <span class="tag ${tag}">${TAGS[tag]}</span>` : ''}</td>
+          <td>${otherShip(p[3])}</td>
+          <td class="num">${fmt(p[4])}</td><td class="num">${fmt(p[5])}</td><td class="num">${p[9] == null ? '–' : fmt(p[9])}</td><td class="num">${fmt(p[6])}</td><td class="num">${prText(playerPR(r.rec, p))}</td>
+          <td>${p[7] ? '' : '<span class="dead">✕</span>'}</td></tr>`; }).join('')}</tbody></table></div></div>`;
+    const mine = res.team, other = 1 - mine;
+    body = `
+      <div class="kv">
+        <div><b>${fmt(res.dmg)}</b><span>Damage</span></div>
+        <div><b>${fmt(res.xp)}</b><span>XP (Base XP ${fmt(res.baseXp)})</span></div>
+        <div><b>${prText(r.pr)}</b><span>${r.pr == null ? 'PR (PvP battles only)' : 'PR · ' + prBand(r.pr).name}</span></div>
+        <div><b>${placeText(r)}</b><span>Place in team (by base XP)</span></div>
+        <div><b>${mmText(r.mm)}</b><span>${r.mm == null ? 'Matchmaking' : MM_TEXT[r.mm]}</span></div>
+        <div><b>${fmt(res.kills)}</b><span>Warships destroyed</span></div>
+        <div><b>${fmt(res.spot)}</b><span>Spotting damage</span></div>
+        <div><b>${fmt(res.potential)}</b><span>Potential damage</span></div>
+        <div><b>${fmt(res.credits)}</b><span>Credits</span></div>
+        <div><b>${res.alive ? fmt(res.hp) + ' / ' + fmt(res.maxHp) : '✕ ' + fmtTime(res.lifetime)}</b><span>${res.alive ? 'HP remaining' : 'Destroyed after'}</span></div>
+        <div><b>${fmtTime(res.duration)}</b><span>Battle duration</span></div>
+        <div><b>${nf.format(res.distance)} km</b><span>Distance travelled</span></div>
+      </div>
+      <div class="teams">${teamTable(teams[mine], 'Your team')}${teamTable(teams[other], 'Enemy team')}</div>
+      ${window.GAME_DATA ? '' : '<p class="note">ships.js is missing, so ship names for other players are only shown for ships you have played yourself. Run <code>python update_ships.py</code>.</p>'}`;
+  } else {
+    body = `<p class="muted">This replay has no battle results – usually because you left the battle before it ended (e.g. after your ship was destroyed).</p>`;
+  }
+  $('#drawer').innerHTML = `
+    <button class="btn ghost close" id="close">Close</button>
+    <h2 class="shipcell">${flagIcon(r.ship)}${classIcon(r.ship)}<span class="muted tier">${tierText(r.tier)}</span> <span class="kind-${r.kind}">${esc(r.shipName)}</span> <span class="pill ${r.win}">${pill}</span></h2>
+    <div class="muted">${esc(r.map)} · ${esc(r.mode)} · ${fmtDate(r.date)} · ${esc(r.cls)}${r.nation ? ', ' + esc(r.nation) : ''}${r.kind ? ' · ' + KINDS[r.kind] : ''} · v${esc(r.rec.version)}</div>
+    ${body}
+    <p class="note">File: <span class="file">${esc(r.file)}</span> <button class="btn ghost" id="copy" style="padding:2px 8px;font-size:12px">Copy file name</button><br>
+    Open the replay by double-clicking the file in Explorer (the game must be closed).</p>`;
+  $('#drawer').classList.add('open'); $('#overlay').classList.add('open');
+  $('#close').onclick = closeDetail;
+  $('#copy').onclick = () => navigator.clipboard?.writeText(r.file.split('/').pop());
+}
+function closeDetail() { $('#drawer').classList.remove('open'); $('#overlay').classList.remove('open'); }
+$('#overlay').onclick = closeDetail;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+$('#thead').onclick = e => {
+  const k = e.target.closest('th')?.dataset.k;
+  if (!k || k === 'rank') return;
+  if (view.sort === k) view.dir = -view.dir;
+  else { view.sort = k; view.dir = k !== 'place' && (COLS.find(c => c.k === k).num || k === 'date') ? -1 : 1; }
+  view.limit = 200;
+  render();
+};
+$('#tbody').onclick = e => { const tr = e.target.closest('tr'); if (tr) openDetail(tr.dataset.key); };
+$('#cards').onclick = e => { const c = e.target.closest('.card.click'); if (c?.dataset.key) openDetail(c.dataset.key); };
+$('#morebtn').onclick = () => { view.limit += 200; render(); };
+$('#reset').onclick = () => {
+  for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#known', '#minxp']) $(id).value = '';
+  Object.assign(view, { sort: 'date', dir: -1, limit: 200 }); render();
+};
+for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#known', '#minxp']) $(id).addEventListener('input', () => { view.limit = 200; render(); });
+
+// ---------- startup: show cached results, reconnect to the last folder ----------
+(async () => {
+  try {
+    const cached = (await db.all()).filter(c => !c.error && c.key.startsWith(PARSER_VERSION + '|'));
+    learnShips(cached);
+    rows = cached.map(toRow);
+    render();
+    dirHandle = await db.get('dir');
+    if (dirHandle) {
+      $('#rescan').hidden = false;
+      $('#pick').textContent = 'Change folder';
+      if ((await dirHandle.queryPermission({ mode: 'read' })) === 'granted') scanHandle();
+      else $('#status').textContent = rows.length ? 'Click “Rescan” to load new replays' : '';
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+})();
+</script>
+</body>
+</html>

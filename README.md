@@ -56,8 +56,9 @@ This rewrites `ships.js`, `expected.js` and `assets/`.
 
 ## Notable players
 
-The list of clans and players to highlight is the `HIGHLIGHT` object in `src/app.html`.
-Edit it, then rebuild (see below).
+To highlight your clanmates, friendly clans and players you know, copy
+`highlight.example.js` to `highlight.js` and fill in your own names. The file is ignored by
+git, so your list stays on your machine.
 
 ## Development
 
@@ -70,6 +71,7 @@ The app is a single static page – no framework, no dependencies, no server.
 | `index.html` | The built page. This is what you open. |
 | `update_ships.py` | Extracts ship data, icons and flags from the game, and downloads PR expected values. |
 | `ships.js`, `expected.js`, `assets/` | Generated data. |
+| `highlight.example.js` | Template for your own `highlight.js` (notable players). |
 
 After editing `src/app.html`:
 
