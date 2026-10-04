@@ -6,6 +6,8 @@ Point it at your `replays` folder and it lists every battle with the result, dam
 ships destroyed and more – sortable and filterable, so you can find your best games.
 Everything runs in your browser. No server, no account, nothing is uploaded.
 
+![The battle list with summary cards, filters and one row per replay](docs/screenshot.webp)
+
 ## Features
 
 - **Battle list** – date, ship, tier, type, map, battle type, result, damage, XP, base XP,
