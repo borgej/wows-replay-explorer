@@ -19,6 +19,8 @@ Everything runs in your browser. No server, no account, nothing is uploaded.
   damage, base XP and PR.
 - **Personal Rating (PR)** – the WoWS Numbers formula, per battle and overall, for PvP
   battles.
+- **PR over time** – click the Personal Rating card for a chart of your rolling PR, battle
+  by battle, to see whether you are improving.
 - **Matchmaking** – shows whether you were uptiered (↓, ↓↓), top tier (↑, ↑↑) or in a
   same-tier battle (=), and how often each happens.
 - **Team place** – where you finished on your team, ranked by base XP.

@@ -107,6 +107,30 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .card.wide { grid-column: span 2; }
 .pct.down { color: var(--loss); } .pct.up { color: var(--win); }
 .pr { font-weight: 700; }
+/* PR chart */
+.modal { position: fixed; top: 2vh; left: 50%; transform: translateX(-50%); width: calc(100vw - 32px); max-height: 96vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; z-index: 12; padding: 18px 18px 14px; display: none; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.modal.open { display: block; }
+.modal h2 { margin: 0; font-size: 18px; }
+.modal .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--panel); border: 0; border-right: 1px solid var(--line); padding: 5px 11px; cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.plot { position: relative; margin-top: 10px; }
+.plot svg { display: block; width: 100%; cursor: crosshair; }
+.plot text { font: 11px Inter, system-ui, sans-serif; fill: var(--muted); }
+.plot .grid { stroke: var(--line); stroke-width: 1; }
+.plot .band { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.plot .cross { stroke: var(--muted); stroke-width: 1; }
+.tip { position: absolute; top: 8px; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: var(--shadow); min-width: 210px; display: none; white-space: nowrap; }
+.tip b { font-size: 13px; }
+.tip dl { display: grid; grid-template-columns: auto auto; gap: 1px 14px; margin: 6px 0 0; }
+.tip dt { color: var(--muted); } .tip dd { margin: 0; text-align: right; font-family: 'JetBrains Mono', monospace; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.legend-row i { display: inline-block; vertical-align: middle; margin-right: 5px; }
+.dot-w { width: 9px; height: 9px; border-radius: 50%; background: var(--win); }
+.dot-l { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; border: 2px solid var(--loss); }
+.ln-u { width: 16px; height: 2px; background: var(--win); } .ln-d { width: 16px; height: 2px; background: var(--loss); }
 .prchip { display: inline-block; padding: 0 7px; border-radius: 4px; color: #fff; font: 600 12px Inter, system-ui, sans-serif; vertical-align: middle; }
 .card .unit { font: 500 13px Inter, system-ui, sans-serif; color: var(--muted); }
 .mmbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0 6px; background: var(--panel-2); gap: 2px; }
@@ -185,6 +209,7 @@ tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
 
 <div class="overlay" id="overlay"></div>
 <aside class="drawer" id="drawer"></aside>
+<section class="modal" id="chart" aria-label="Personal Rating over time"></section>
 
 <!-- Parser: runs both on the page and inside the worker pool, so it must not touch the DOM. -->
 <!-- Ship data extracted from the game (optional; regenerate with update_ships.py). -->
@@ -717,6 +742,8 @@ function render() {
   const me = rows.find(r => r.player)?.player;
   $('#who').textContent = me ? `– ${me}` : '';
   fillSelect($('#mode'), new Set(rows.map(r => r.mode)));
+  // Start on Random Battles; the user can still pick another battle type, or Reset to see all.
+  if (!view.modeChosen && [...$('#mode').options].some(o => o.value === 'Random Battle')) { $('#mode').value = 'Random Battle'; view.modeChosen = true; }
   fillSelect($('#cls'), new Set(rows.map(r => r.cls).filter(Boolean)));
 
   const list = filtered();
@@ -815,9 +842,126 @@ function prCard(list) {
   }
   if (!n) return '';
   const pr = prFormula(dmg, frags, wins, eDmg, eFrags, eWins), band = prBand(pr);
-  return `<div class="card"><div class="lbl">Personal Rating</div>
+  return `<div class="card click" data-action="pr" title="Show PR over time"><div class="lbl">Personal Rating ↗</div>
     <div class="val" style="color:${band.color}">${nf.format(pr)}</div>
     <div class="sub"><span class="prchip" style="background:${band.color}">${band.name}</span> ${nf.format(n)} PvP battles</div></div>`;
+}
+
+// ---------- PR over time ----------
+// Line: rolling PR over the last N battles (single-battle PR is far too noisy to read a trend from).
+// One dot per battle on the line: filled = victory, ring = defeat.
+const prChart = { list: [], roll: [], window: 50 };
+
+function rollingPR(list, window) {
+  const sums = [[0, 0, 0, 0, 0, 0]];
+  for (const r of list) {
+    const e = EXPECTED[r.rec.result.shipId], p = sums[sums.length - 1];
+    sums.push([p[0] + r.dmg, p[1] + r.kills, p[2] + (r.win === 'W' ? 1 : 0), p[3] + e[0], p[4] + e[1], p[5] + e[2] / 100]);
+  }
+  return list.map((_, i) => {
+    const a = sums[i + 1], b = sums[window ? Math.max(0, i + 1 - window) : 0];
+    return prFormula(a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3], a[4] - b[4], a[5] - b[5]);
+  });
+}
+
+function openPrChart() {
+  prChart.list = filtered().filter(r => r.pr != null).sort((a, b) => a.date - b.date);
+  if (!prChart.list.length) return;
+  $('#chart').classList.add('open'); $('#overlay').classList.add('open');
+  renderPrChart();
+}
+
+function renderPrChart() {
+  const { list, window: win } = prChart;
+  const n = list.length;
+  const roll = prChart.roll = rollingPR(list, win);
+  const last = roll[n - 1], band = prBand(last);
+  const delta = last - roll[Math.max(0, n - 1 - (win || n))];
+  const span = win && n > win ? `${win} battles earlier` : 'the first battle';
+  const fmtDay = t => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const W = Math.max(320, $('#chart').clientWidth - 36), H = Math.max(320, window.innerHeight * 0.96 - 190), L = 46, Rm = 104, T = 12, B = 26;
+  const pw = W - L - Rm, ph = H - T - B;
+  let lo = Math.min(...roll), hi = Math.max(...roll);
+  const pad = Math.max(50, (hi - lo) * 0.08);
+  lo = Math.max(0, Math.floor((lo - pad) / 100) * 100); hi = Math.ceil((hi + pad) / 100) * 100;
+  const x = i => L + (n === 1 ? pw / 2 : i / (n - 1) * pw);
+  const y = v => T + ph - (v - lo) / (hi - lo) * ph;
+
+  const step = [50, 100, 200, 250, 500, 1000].find(st => (hi - lo) / st <= 7) || 1000;
+  let grid = '';
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    grid += `<line class="grid" x1="${L}" x2="${L + pw}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${nf.format(v)}</text>`;
+  }
+  const bands = PR_BANDS.filter(b => b[0] > lo && b[0] < hi).map(b =>
+    `<line class="band" x1="${L}" x2="${L + pw}" y1="${y(b[0])}" y2="${y(b[0])}"/><rect x="${L + pw + 8}" y="${y(b[0]) - 4}" width="8" height="8" rx="2" fill="${b[2]}"/><text x="${L + pw + 20}" y="${y(b[0]) + 4}">${b[1]}</text>`).join('');
+  const ticks = n < 2 ? [0] : [...new Set([0, .25, .5, .75, 1].map(f => Math.round(f * (n - 1))))];
+  const xAxis = ticks.map(i => `<text x="${x(i)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${nf.format(i + 1)}</text>`).join('');
+
+  let line = '';
+  for (let i = 1; i < n; i++) {
+    line += `<line x1="${x(i - 1).toFixed(1)}" y1="${y(roll[i - 1]).toFixed(1)}" x2="${x(i).toFixed(1)}" y2="${y(roll[i]).toFixed(1)}" stroke="var(${roll[i] >= roll[i - 1] ? '--win' : '--loss'})" stroke-width="2" stroke-linecap="round"/>`;
+  }
+  const r = Math.max(1.6, Math.min(4, pw / n / 2.4));
+  const dots = list.map((b, i) => b.win === 'W'
+    ? `<circle cx="${x(i).toFixed(1)}" cy="${y(roll[i]).toFixed(1)}" r="${r}" fill="var(--win)" stroke="var(--bg)" stroke-width="${r > 3 ? 1.5 : 0}"/>`
+    : `<circle cx="${x(i).toFixed(1)}" cy="${y(roll[i]).toFixed(1)}" r="${r}" fill="var(--bg)" stroke="var(--loss)" stroke-width="${Math.max(1, r / 2.2)}"/>`).join('');
+
+  $('#chart').innerHTML = `
+    <div class="head">
+      <h2>Personal Rating over time</h2>
+      <span class="pr" style="color:${band.color};font:600 20px 'JetBrains Mono',monospace">${nf.format(last)}</span>
+      <span class="prchip" style="background:${band.color}">${band.name}</span>
+      <span class="${delta >= 0 ? 'pct up' : 'pct down'}" style="font-weight:600">${delta >= 0 ? '▲ +' : '▼ '}${nf.format(delta)}</span><span class="muted">vs ${span}</span>
+      <div class="spacer"></div>
+      <span class="muted">PR calculated from the last</span>
+      <div class="seg">${[10, 25, 50, 100, 0].map(w => `<button data-w="${w}" class="${w === win ? 'on' : ''}">${w || 'All'}</button>`).join('')}</div>
+      <span class="muted">battles</span>
+      <button class="btn ghost" id="chartclose">Close</button>
+    </div>
+    <div class="muted">${nf.format(n)} PvP battles in the current filter · ${fmtDay(list[0].date)} – ${fmtDay(list[n - 1].date)} · ${win
+      ? `Each point is your PR for that battle and the ${win - 1} before it. Fewer battles: reacts faster to your recent form. More battles: a smoother long-term trend.`
+      : 'Each point is your PR for all battles up to and including that one.'}</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Rolling Personal Rating per battle">
+        ${grid}${bands}${xAxis}
+        ${line}${dots}
+        <line class="cross" id="cross" y1="${T}" y2="${T + ph}" visibility="hidden"/>
+        <circle id="focus" r="6" fill="none" stroke="var(--text)" stroke-width="2" visibility="hidden"/>
+      </svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="legend-row">
+      <span><i class="ln-u"></i>PR rising</span><span><i class="ln-d"></i>PR falling</span>
+      <span><i class="dot-w"></i>Victory</span><span><i class="dot-l"></i>Defeat</span>
+      <span>X axis: battle number, oldest first · hover a battle for details, click to open it</span>
+    </div>`;
+
+  $('#chartclose').onclick = closeDetail;
+  $('#chart .seg').onclick = e => { const w = e.target.dataset.w; if (w != null) { prChart.window = +w; renderPrChart(); } };
+  const svg = $('#chart svg'), tip = $('#tip'), cross = $('#cross'), focus = $('#focus');
+  const indexAt = e => {
+    const box = svg.getBoundingClientRect();
+    const px = (e.clientX - box.left) / box.width * W;
+    return Math.max(0, Math.min(n - 1, Math.round((px - L) / pw * (n - 1))));
+  };
+  svg.onmousemove = e => {
+    const i = indexAt(e), b = list[i], cx = x(i), width = svg.getBoundingClientRect().width;
+    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+    focus.setAttribute('cx', cx); focus.setAttribute('cy', y(roll[i])); focus.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<b>${flagIcon(b.ship)}${tierText(b.tier)} ${esc(b.shipName)}</b> <span class="pill ${b.win}">${b.win === 'W' ? 'Victory' : b.win === 'D' ? 'Draw' : 'Defeat'}</span>
+      <div class="muted">#${nf.format(i + 1)} · ${fmtDate(b.date)} · ${esc(b.map)} · ${esc(b.mode)}</div>
+      <dl><dt>${win ? `PR, last ${Math.min(win, i + 1)} battles` : 'PR, all battles so far'}</dt><dd>${prText(roll[i])}</dd>
+      <dt>PR, this battle</dt><dd>${prText(b.pr)}</dd>
+      <dt>Damage</dt><dd>${fmt(b.dmg)}</dd><dt>Warships destroyed</dt><dd>${fmt(b.kills)}</dd>
+      <dt>Base XP</dt><dd>${fmt(b.baseXp)}</dd><dt>Team place</dt><dd>${b.place ? b.place + ' / ' + b.teamSize : '–'}</dd></dl>`;
+    tip.style.display = 'block';
+    const left = cx * width / W, flip = left > width / 2;
+    tip.style.left = flip ? '' : `${left + 14}px`;
+    tip.style.right = flip ? `${width - left + 14}px` : '';
+  };
+  svg.onmouseleave = () => { tip.style.display = 'none'; cross.setAttribute('visibility', 'hidden'); focus.setAttribute('visibility', 'hidden'); };
+  svg.onclick = e => { const b = list[indexAt(e)]; closeDetail(); openDetail(b.key); };
 }
 
 function mmCard(list) {
@@ -922,9 +1066,10 @@ function openDetail(key) {
   $('#close').onclick = closeDetail;
   $('#copy').onclick = () => navigator.clipboard?.writeText(r.file.split('/').pop());
 }
-function closeDetail() { $('#drawer').classList.remove('open'); $('#overlay').classList.remove('open'); }
+function closeDetail() { for (const id of ['#drawer', '#chart', '#overlay']) $(id).classList.remove('open'); }
 $('#overlay').onclick = closeDetail;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+window.addEventListener('resize', () => { if ($('#chart').classList.contains('open')) renderPrChart(); });
 
 $('#thead').onclick = e => {
   const k = e.target.closest('th')?.dataset.k;
@@ -935,7 +1080,11 @@ $('#thead').onclick = e => {
   render();
 };
 $('#tbody').onclick = e => { const tr = e.target.closest('tr'); if (tr) openDetail(tr.dataset.key); };
-$('#cards').onclick = e => { const c = e.target.closest('.card.click'); if (c?.dataset.key) openDetail(c.dataset.key); };
+$('#cards').onclick = e => {
+  const c = e.target.closest('.card.click');
+  if (c?.dataset.action === 'pr') openPrChart();
+  else if (c?.dataset.key) openDetail(c.dataset.key);
+};
 $('#morebtn').onclick = () => { view.limit += 200; render(); };
 $('#reset').onclick = () => {
   for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#known', '#minxp']) $(id).value = '';
