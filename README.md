@@ -10,8 +10,8 @@ Everything runs in your browser. No server, no account, nothing is uploaded.
 
 ## Features
 
-- **Battle list** – date, ship, tier, type, map, battle type, result, damage, XP, base XP,
-  ships destroyed, spotting damage, potential damage, credits and survival. Click a column
+- **Battle list** – date, ship, tier, type, map, battle type, result, damage, base XP,
+  ships destroyed, spotting damage, potential damage, base credits and survival. Click a column
   to sort.
 - **Summary cards** – win rate, averages, and your records (most damage, XP, spotting,
   potential damage). The cards follow the active filters.

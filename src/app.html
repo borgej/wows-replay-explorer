@@ -221,7 +221,7 @@ tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
 
 <script id="core">
 /*BF_INIT*/
-const PARSER_VERSION = 3;
+const PARSER_VERSION = 4;
 const WOWS_KEY = [0x29,0xB7,0xC9,0x09,0x38,0x3F,0x84,0x88,0xFA,0x98,0xEC,0x4E,0x13,0x19,0x79,0xFB];
 
 function makeBlowfish(key) {
@@ -344,12 +344,12 @@ async function parseReplay(buf) {
   const winner = r.commonList[3];
   const num = n => (typeof n === 'number' ? Math.round(n) : 0);
   const players = Object.values(r.playersPublicInfo).map(row => [
-    row[1], row[3] || '', row[6], row[7], num(row[x + 22]), num(row[26]), num(row[x]), row[21] ? 1 : 0, row[0] === me[0] ? 1 : 0, num(row[x - 1]),
+    row[1], row[3] || '', row[6], row[7], num(row[x + 22]), num(row[32]), num(row[x]), row[21] ? 1 : 0, row[0] === me[0] ? 1 : 0,
   ]);
   out.result = {
     win: winner === -1 ? 'D' : winner === me[6] ? 'W' : 'L',
-    shipId: me[7], dmg: num(me[x + 22]), xp: num(econ[3]), baseXp: num(me[x - 1]), credits: num(econ[0]),
-    kills: num(me[26]), spot: num(me[x + 8]), potential: num(me[x + 12]),
+    shipId: me[7], dmg: num(me[x + 22]), xp: num(econ[3]), credits: num(econ[0]),
+    kills: num(me[32]), spot: num(me[x + 8]), potential: num(me[x + 12]),
     alive: !!me[21], hp: num(me[20]), maxHp: num(me[15]), lifetime: num(me[22]), duration: num(r.commonList[8]),
     distance: typeof me[23] === 'number' ? Math.round(me[23] * 10) / 10 : 0,
     start: r.commonList[2], team: me[6], players,
@@ -515,7 +515,7 @@ const hl = (() => {
   };
 })();
 
-// p = [name, clan, team, shipId, damage, destroyed, xp, alive, isMe, baseXp]
+// p = [name, clan, team, shipId, damage, destroyed, baseXp, alive, isMe]
 function tagOf(p) {
   if (p[8] || hl.norm(p[0]) === hl.self) return null;
   if (hl.players.has(hl.norm(p[0]))) return 'player';
@@ -531,10 +531,9 @@ let dirHandle = null;
 let shipNames = {};     // shipId -> ship index, learned from own battles
 const view = { sort: 'date', dir: -1, limit: 200 };
 
-// The post-battle team list ranks players by base XP; older cached records lack it, so fall back to XP.
-const baseXpOf = p => p[9] ?? p[6];
+// The post-battle team list ranks players by base XP (which includes the +50% for a victory).
 function teamOrder(players, team) {
-  return players.filter(p => p[2] === team).sort((a, b) => baseXpOf(b) - baseXpOf(a) || b[4] - a[4]);
+  return players.filter(p => p[2] === team).sort((a, b) => b[6] - a[6] || b[4] - a[4]);
 }
 
 function toRow(rec) {
@@ -551,7 +550,7 @@ function toRow(rec) {
     key: rec.key, file: rec.file, rec, date: dateFromFile(rec.file, rec.dateTime),
     ship: s, place, teamSize: team.length, kind: s.kind, mm, pr: battlePR(rec),
     shipName: s.name, tier: s.tier || null, nation: s.nation, cls: s.cls, map: mapName(rec.map), mode: modeName(rec.mode),
-    win: r ? r.win : 'N', dmg: r?.dmg ?? null, xp: r?.xp ?? null, baseXp: r?.baseXp ?? null, kills: r?.kills ?? null,
+    win: r ? r.win : 'N', dmg: r?.dmg ?? null, xp: r?.xp ?? null, kills: r?.kills ?? null,
     spot: r?.spot ?? null, potential: r?.potential ?? null, credits: r?.credits ?? null,
     alive: r ? r.alive : null, lifetime: r?.lifetime ?? null, player: rec.player,
     search: `${s.name} ${mapName(rec.map)} ${modeName(rec.mode)} ${rec.file} ${r ? r.players.map(playerLabel).join(' ') : ''}`.toLowerCase(),
@@ -688,12 +687,11 @@ const COLS = [
   { k: 'place', t: 'Team place', num: 1 },
   { k: 'notableCount', t: 'Notable players' },
   { k: 'dmg', t: 'Damage', num: 1 },
-  { k: 'xp', t: 'XP', num: 1 },
-  { k: 'baseXp', t: 'Base XP', num: 1 },
+  { k: 'xp', t: 'Base XP', num: 1 },
   { k: 'kills', t: 'Destroyed', num: 1 },
   { k: 'spot', t: 'Spotting dmg', num: 1 },
   { k: 'potential', t: 'Potential dmg', num: 1 },
-  { k: 'credits', t: 'Credits', num: 1 },
+  { k: 'credits', t: 'Base credits', num: 1 },
   { k: 'lifetime', t: 'Survival', num: 1 },
 ];
 
@@ -709,7 +707,7 @@ function filtered() {
     (!q || q.split(/\s+/).every(w => r.search.includes(w))) &&
     (!mode || r.mode === mode) && (!cls || r.cls === cls) && (!kind || kind.includes(r.kind)) &&
     (!res || r.win === res) &&
-    (!minXp || (r.baseXp ?? 0) >= minXp) &&
+    (!minXp || (r.xp ?? 0) >= minXp) &&
     (!since || r.date >= since));
 }
 
@@ -771,7 +769,6 @@ function render() {
       <td>${notableChips(r.notable)}</td>
       <td class="num">${fmt(r.dmg)}</td>
       <td class="num">${fmt(r.xp)}</td>
-      <td class="num">${fmt(r.baseXp)}</td>
       <td class="num">${fmt(r.kills)}</td>
       <td class="num">${fmt(r.spot)}</td>
       <td class="num">${fmt(r.potential)}</td>
@@ -954,7 +951,7 @@ function renderPrChart() {
       <dl><dt>${win ? `PR, last ${Math.min(win, i + 1)} battles` : 'PR, all battles so far'}</dt><dd>${prText(roll[i])}</dd>
       <dt>PR, this battle</dt><dd>${prText(b.pr)}</dd>
       <dt>Damage</dt><dd>${fmt(b.dmg)}</dd><dt>Warships destroyed</dt><dd>${fmt(b.kills)}</dd>
-      <dt>Base XP</dt><dd>${fmt(b.baseXp)}</dd><dt>Team place</dt><dd>${b.place ? b.place + ' / ' + b.teamSize : '–'}</dd></dl>`;
+      <dt>Base XP</dt><dd>${fmt(b.xp)}</dd><dt>Team place</dt><dd>${b.place ? b.place + ' / ' + b.teamSize : '–'}</dd></dl>`;
     tip.style.display = 'block';
     const left = cx * width / W, flip = left > width / 2;
     tip.style.left = flip ? '' : `${left + 14}px`;
@@ -1003,9 +1000,9 @@ function renderCards(list) {
   $('#cards').innerHTML = `
     <div class="card"><div class="lbl">Battles</div><div class="val">${nf.format(list.length)}</div><div class="sub">${nf.format(withRes.length)} with results</div></div>
     <div class="card"><div class="lbl">Win rate</div><div class="val">${withRes.length ? (wins / withRes.length * 100).toFixed(1) + '%' : '–'}</div><div class="sub">${nf.format(wins)} victories</div></div>
-    <div class="card"><div class="lbl">Average damage</div><div class="val">${fmt(avg('dmg'))}</div><div class="sub">Average XP ${fmt(avg('xp'))}</div></div>
+    <div class="card"><div class="lbl">Average damage</div><div class="val">${fmt(avg('dmg'))}</div><div class="sub">Average base XP ${fmt(avg('xp'))}</div></div>
     <div class="card click" data-key="${esc(bd?.key)}"><div class="lbl">Most damage</div><div class="val">${fmt(bd?.dmg)}</div><div class="sub">${sub(bd)}</div></div>
-    <div class="card click" data-key="${esc(bx?.key)}"><div class="lbl">Most XP</div><div class="val">${fmt(bx?.xp)}</div><div class="sub">${sub(bx)}</div></div>
+    <div class="card click" data-key="${esc(bx?.key)}"><div class="lbl">Most base XP</div><div class="val">${fmt(bx?.xp)}</div><div class="sub">${sub(bx)}</div></div>
     <div class="card click" data-key="${esc(bk?.key)}"><div class="lbl">Most warships destroyed</div><div class="val">${fmt(bk?.kills)}</div><div class="sub">${sub(bk)}</div></div>
     <div class="card"><div class="lbl">Average spotting dmg</div><div class="val">${fmt(avg('spot'))}</div><div class="sub">Average potential ${fmt(avg('potential'))}</div></div>
     <div class="card click" data-key="${esc(bs?.key)}"><div class="lbl">Most spotting dmg</div><div class="val">${fmt(bs?.spot)}</div><div class="sub">${sub(bs)}</div></div>
@@ -1027,25 +1024,25 @@ function openDetail(key) {
     const teams = [0, 1].map(t => teamOrder(res.players, t));
     const teamTable = (list, title) => `
       <div class="team"><h3>${title}</h3><div class="tablewrap"><table>
-        <thead><tr><th class="num">#</th><th>Player</th><th>Ship</th><th class="num">Damage</th><th class="num">Destroyed</th><th class="num">Base XP</th><th class="num">XP</th><th class="num">PR</th><th></th></tr></thead>
+        <thead><tr><th class="num">#</th><th>Player</th><th>Ship</th><th class="num">Damage</th><th class="num">Destroyed</th><th class="num">Base XP</th><th class="num">PR</th><th></th></tr></thead>
         <tbody>${list.map((p, i) => { const tag = tagOf(p); return `<tr class="${p[8] ? 'me' : ''} ${tag ? 'hl-' + tag : ''}">
           <td class="num muted">${i + 1}</td>
           <td>${p[1] ? `<span class="muted">[${esc(p[1])}]</span> ` : ''}${esc(botName(p[0]))}${tag ? ` <span class="tag ${tag}">${TAGS[tag]}</span>` : ''}</td>
           <td>${otherShip(p[3])}</td>
-          <td class="num">${fmt(p[4])}</td><td class="num">${fmt(p[5])}</td><td class="num">${p[9] == null ? '–' : fmt(p[9])}</td><td class="num">${fmt(p[6])}</td><td class="num">${prText(playerPR(r.rec, p))}</td>
+          <td class="num">${fmt(p[4])}</td><td class="num">${fmt(p[5])}</td><td class="num">${fmt(p[6])}</td><td class="num">${prText(playerPR(r.rec, p))}</td>
           <td>${p[7] ? '' : '<span class="dead">✕</span>'}</td></tr>`; }).join('')}</tbody></table></div></div>`;
     const mine = res.team, other = 1 - mine;
     body = `
       <div class="kv">
         <div><b>${fmt(res.dmg)}</b><span>Damage</span></div>
-        <div><b>${fmt(res.xp)}</b><span>XP (Base XP ${fmt(res.baseXp)})</span></div>
+        <div><b>${fmt(res.xp)}</b><span>Base XP</span></div>
         <div><b>${prText(r.pr)}</b><span>${r.pr == null ? 'PR (PvP battles only)' : 'PR · ' + prBand(r.pr).name}</span></div>
         <div><b>${placeText(r)}</b><span>Place in team (by base XP)</span></div>
         <div><b>${mmText(r.mm)}</b><span>${r.mm == null ? 'Matchmaking' : MM_TEXT[r.mm]}</span></div>
         <div><b>${fmt(res.kills)}</b><span>Warships destroyed</span></div>
         <div><b>${fmt(res.spot)}</b><span>Spotting damage</span></div>
         <div><b>${fmt(res.potential)}</b><span>Potential damage</span></div>
-        <div><b>${fmt(res.credits)}</b><span>Credits</span></div>
+        <div><b>${fmt(res.credits)}</b><span>Base credits (before Premium and bonuses)</span></div>
         <div><b>${res.alive ? fmt(res.hp) + ' / ' + fmt(res.maxHp) : '✕ ' + fmtTime(res.lifetime)}</b><span>${res.alive ? 'HP remaining' : 'Destroyed after'}</span></div>
         <div><b>${fmtTime(res.duration)}</b><span>Battle duration</span></div>
         <div><b>${nf.format(res.distance)} km</b><span>Distance travelled</span></div>
