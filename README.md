@@ -2,7 +2,7 @@
 
 A local web app that shows your own stats from your World of Warships replay files.
 
-Point it at your `replays` folder and it lists every battle with the result, damage, XP,
+Point it at your `replays` folder and it lists every battle with the result, damage, base XP,
 ships destroyed and more – sortable and filterable, so you can find your best games.
 Everything runs in your browser. No server, no account, nothing is uploaded.
 
@@ -13,22 +13,28 @@ Everything runs in your browser. No server, no account, nothing is uploaded.
 - **Battle list** – date, ship, tier, type, map, battle type, result, damage, base XP,
   ships destroyed, spotting damage, potential damage, base credits and survival. Click a column
   to sort.
-- **Summary cards** – win rate, averages, and your records (most damage, XP, spotting,
-  potential damage). The cards follow the active filters.
+- **Summary cards** – win rate (also per tier, coloured on the same scale as PR), averages,
+  and your records (most damage, base XP, spotting, potential damage). The cards follow the
+  active filters.
 - **Battle details** – the full scoreboard for both teams, with every player's ship,
-  damage, base XP and PR.
+  damage, ships destroyed, base XP and PR for that battle.
 - **Personal Rating (PR)** – the WoWS Numbers formula, per battle and overall, for PvP
-  battles.
-- **PR over time** – click the Personal Rating card for a chart of your rolling PR, battle
-  by battle, to see whether you are improving.
+  battles, with an arrow showing whether your recent battles are better or worse than the
+  ones before them.
+- **PR over time** – click the Personal Rating card for a chart of your PR over the last
+  10–100 battles, battle by battle, to see whether you are improving. Click a ship name in
+  the list, or pick a ship in the chart, to see your development on that ship alone.
 - **Matchmaking** – shows whether you were uptiered (↓, ↓↓), top tier (↑, ↑↑) or in a
-  same-tier battle (=), and how often each happens.
+  same-tier battle (=), how often each happens, and your win rate in each case.
 - **Team place** – where you finished on your team, ranked by base XP.
 - **Ships as in the game** – real names, tiers, nation flags, class icons, and premium /
   special ships marked in gold / orange.
 - **Notable players** – highlights clanmates, friendly clans and players you know.
-- **Filters** – battle type, ship type, tech tree / premium, result, period, matchmaking,
-  notable players, minimum base XP, and free-text search (ship, map, player, clan).
+- **Filters** – quick period buttons (today, yesterday, last 3 / 7 / 30 / 90 days, last
+  year), battle type, ship type, tech tree / premium, result, matchmaking, notable players,
+  minimum base XP, and free-text search (ship, map, player, clan). The app opens on Random
+  Battles.
+- **Auto-scan** – optionally checks the folder for new replays every 30 seconds.
 - Light and dark theme.
 
 ## Getting started
@@ -40,7 +46,9 @@ Everything runs in your browser. No server, no account, nothing is uploaded.
 
 The first scan reads every replay (a few thousand files take about a minute). Results are
 cached in the browser, so after that only new replays are read – click **Rescan** after
-playing.
+playing, or tick **Auto-scan** to have the folder checked for new replays every 30 seconds.
+The browser asks you to allow access to the folder again once per visit; click **Rescan**
+to do that.
 
 Replays must be enabled in the game. Battles you left before they ended have no results
 and show up as "No data".

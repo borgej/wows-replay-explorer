@@ -29,6 +29,7 @@
   --loss: #f07166; --loss-soft: #3a1b19; --draw: #d9b453; --gold: #e0a93e; --special: #f08a4b; --ci-plain: none; --ci-color: none; --shadow: none;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--text); font: 14px/1.45 Inter, system-ui, sans-serif; }
 .wrap { padding: 20px 24px 60px; }
@@ -42,15 +43,19 @@ button, select, input { font: inherit; color: inherit; }
 .btn.ghost { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
 .btn:disabled { opacity: .5; cursor: default; }
 .status { color: var(--muted); font-size: 13px; }
+.auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
+.auto input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
 .progress { height: 4px; background: var(--panel-2); border-radius: 4px; overflow: hidden; width: 220px; display: none; }
 .progress div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 18px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); }
+/* Small cards fill the left in two rows; the two cards with a table sit on the far right. */
+.cards { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-bottom: 14px; }
+.smallcards { flex: 1 1 560px; min-width: 0; display: grid; grid-template-rows: repeat(2, 1fr); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px 8px; box-shadow: var(--shadow); min-width: 0; }
 .card.click { cursor: pointer; }
 .card.click:hover { border-color: var(--accent); }
-.card .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-.card .val { font: 600 22px/1.2 'JetBrains Mono', monospace; margin-top: 4px; }
-.card .sub { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .val { font: 600 18px/1.2 'JetBrains Mono', monospace; margin-top: 1px; }
+.card .sub { color: var(--muted); font-size: 11px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
 .filters input, .filters select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
 .filters input[type=search] { min-width: 220px; flex: 1; max-width: 340px; }
@@ -104,9 +109,15 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .kind-s { color: var(--special); }
 .first { color: var(--gold); font-weight: 700; }
 .mm { font-weight: 700; letter-spacing: -.1em; }
-.card.wide { grid-column: span 2; }
+.card.wide { flex: 0 0 auto; min-width: 270px; }
+.mini { display: grid; gap: 1px 6px; margin-top: 5px; font: 12px 'JetBrains Mono', monospace; text-align: right; align-items: baseline; }
+.mini .rowlbl { text-align: left; color: var(--muted); font: 11px Inter, system-ui, sans-serif; padding-right: 4px; white-space: nowrap; }
+.mini .hd { color: var(--muted); font-size: 11px; }
+.mini .few { color: var(--muted); opacity: .75; }
 .pct.down { color: var(--loss); } .pct.up { color: var(--win); }
 .pr { font-weight: 700; }
+.trend { font: 600 12px Inter, system-ui, sans-serif; margin-left: 4px; white-space: nowrap; }
+.trend.up { color: var(--win); } .trend.down { color: var(--loss); }
 /* PR chart */
 .modal { position: fixed; top: 2vh; left: 50%; transform: translateX(-50%); width: calc(100vw - 32px); max-height: 96vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; z-index: 12; padding: 18px 18px 14px; display: none; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
 .modal.open { display: block; }
@@ -116,6 +127,9 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .seg button { background: var(--panel); border: 0; border-right: 1px solid var(--line); padding: 5px 11px; cursor: pointer; }
 .seg button:last-child { border-right: 0; }
 .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.shiplink { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--muted); }
+.shiplink:hover { text-decoration-style: solid; text-decoration-color: currentColor; }
+.modal select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; max-width: 280px; }
 .plot { position: relative; margin-top: 10px; }
 .plot svg { display: block; width: 100%; cursor: crosshair; }
 .plot text { font: 11px Inter, system-ui, sans-serif; fill: var(--muted); }
@@ -137,7 +151,10 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .mmbar span { display: block; height: 100%; }
 .mmbar .s-2 { background: var(--loss); } .mmbar .s-1 { background: color-mix(in srgb, var(--loss) 55%, transparent); }
 .mmbar .s0 { background: var(--muted); } .mmbar .s1 { background: color-mix(in srgb, var(--win) 55%, transparent); } .mmbar .s2 { background: var(--win); }
-@media (max-width: 640px) { .card.wide { grid-column: auto; } }
+@media (max-width: 1100px) {
+  .smallcards { flex-basis: 100%; grid-template-rows: none; grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .card.wide { flex: 1 1 270px; }
+}
 .mm.up { color: var(--win); }
 .mm.down { color: var(--loss); }
 .mm.even { color: var(--muted); }
@@ -165,12 +182,19 @@ tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
     <div class="progress" id="progress"><div></div></div>
     <span class="status" id="status"></span>
     <button class="btn ghost" id="theme" title="Switch between system, light and dark theme"></button>
+    <label class="auto" id="autowrap" hidden title="Check the folder for new replays every 30 seconds"><input type="checkbox" id="auto"> Auto-scan</label>
     <button class="btn ghost" id="rescan" hidden>Rescan</button>
     <button class="btn" id="pick">Select replays folder</button>
     <input type="file" id="dirinput" webkitdirectory multiple hidden>
   </header>
 
   <div class="cards" id="cards"></div>
+
+  <div class="filters" id="periodbar" hidden>
+    <div class="seg" id="period">
+      <button data-p="" class="on">All time</button><button data-p="today">Today</button><button data-p="yesterday">Yesterday</button><button data-p="3">Last 3 days</button><button data-p="7">Last 7 days</button><button data-p="30">Last 30 days</button><button data-p="90">Last 90 days</button><button data-p="365">Last year</button>
+    </div>
+  </div>
 
   <div class="filters" id="filters" hidden>
     <input type="search" id="q" placeholder="Search ship, map, player…">
@@ -181,9 +205,6 @@ tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
     </select>
     <select id="res">
       <option value="">All results</option><option value="W">Victories only</option><option value="L">Defeats only</option><option value="D">Draws</option><option value="N">No results</option>
-    </select>
-    <select id="period">
-      <option value="">All time</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option>
     </select>
     <select id="mm">
       <option value="">All matchmaking</option><option value="-2">↓↓ Double uptiered</option><option value="-1">↓ Uptiered</option><option value="down">↓ / ↓↓ Any uptier</option><option value="0">= Same tier</option><option value="1">↑ Top tier, 1 below</option><option value="2">↑↑ Top tier, 2 below</option><option value="top">= / ↑ / ↑↑ Top tier</option>
@@ -529,7 +550,7 @@ const playerLabel = p => `${p[1] ? `[${p[1]}] ` : ''}${botName(p[0])}`;
 let rows = [];          // flattened, one per replay
 let dirHandle = null;
 let shipNames = {};     // shipId -> ship index, learned from own battles
-const view = { sort: 'date', dir: -1, limit: 200 };
+const view = { sort: 'date', dir: -1, limit: 200, period: '' };
 
 // The post-battle team list ranks players by base XP (which includes the +50% for a victory).
 function teamOrder(players, team) {
@@ -582,9 +603,11 @@ async function filesFromHandle(dir) {
 }
 
 let scanning = false;
+let seenFiles = new Set();   // file names the last scan looked at
 async function processFiles(entries) {
   if (scanning) return;
   scanning = true;
+  seenFiles = new Set(entries.map(e => e.name));
   $('#pick').disabled = $('#rescan').disabled = true;
   try {
     const cached = await db.all();
@@ -648,9 +671,49 @@ async function scanHandle() {
   $('#status').textContent = 'Finding files…';
   const entries = await filesFromHandle(dirHandle);
   $('#rescan').hidden = false;
+  $('#autowrap').hidden = false;
   $('#pick').textContent = 'Change folder';
   await processFiles(entries);
 }
+
+// ---------- auto-scan ----------
+// While the box is ticked, look for new replay files every 30 seconds. Only the file names are
+// compared, so an idle check is cheap; a full scan runs only when a new file has appeared.
+const AUTO_MS = 30000;
+let autoTimer = null;
+const autoOn = () => $('#auto').checked;
+
+async function autoCheck() {
+  if (!autoOn() || scanning || !dirHandle || document.hidden) return;
+  try {
+    if ((await dirHandle.queryPermission({ mode: 'read' })) !== 'granted') {
+      $('#status').textContent = 'Auto-scan is waiting: click “Rescan” to allow access to the folder';
+      return;
+    }
+    let fresh = false;
+    for await (const e of walk(dirHandle)) if (!seenFiles.has(e.name)) { fresh = true; break; }
+    if (fresh) await scanHandle();
+    if (!scanning) $('#status').textContent = `Auto-scan on · checked ${new Date().toLocaleTimeString('en-GB')}`;
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function setAuto(on) {
+  $('#auto').checked = on;
+  try { on ? localStorage.setItem('autoscan', '1') : localStorage.removeItem('autoscan'); } catch {}
+  clearInterval(autoTimer);
+  if (on) { autoTimer = setInterval(autoCheck, AUTO_MS); autoCheck(); }
+  else if (!scanning) $('#status').textContent = '';
+}
+
+$('#auto').onchange = async () => {
+  if (!autoOn()) return setAuto(false);
+  // Ticking the box is a click, so the browser lets us ask for folder access here.
+  if (dirHandle && (await dirHandle.requestPermission({ mode: 'read' })) !== 'granted') return setAuto(false);
+  setAuto(true);
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoCheck(); });
 
 $('#pick').onclick = async () => {
   if (window.showDirectoryPicker) {
@@ -695,10 +758,22 @@ const COLS = [
   { k: 'lifetime', t: 'Survival', num: 1 },
 ];
 
+// The period buttons: "Today" and "Yesterday" are calendar days, the rest count back from now.
+function periodRange() {
+  const p = view.period, midnight = new Date().setHours(0, 0, 0, 0);
+  if (p === 'today') return [midnight, 0];
+  if (p === 'yesterday') return [midnight - 864e5, midnight];
+  return [p ? Date.now() - p * 864e5 : 0, 0];
+}
+function setPeriod(p) {
+  view.period = p;
+  for (const b of $('#period').children) b.classList.toggle('on', b.dataset.p === p);
+}
+
 function filtered() {
   const q = $('#q').value.trim().toLowerCase();
-  const mode = $('#mode').value, cls = $('#cls').value, kind = $('#kind').value, res = $('#res').value, period = +$('#period').value;
-  const since = period ? Date.now() - period * 864e5 : 0;
+  const mode = $('#mode').value, cls = $('#cls').value, kind = $('#kind').value, res = $('#res').value;
+  const [since, until] = periodRange();
   const minXp = +$('#minxp').value || 0;
   const known = $('#known').value, mmf = $('#mm').value;
   return rows.filter(r =>
@@ -708,7 +783,7 @@ function filtered() {
     (!mode || r.mode === mode) && (!cls || r.cls === cls) && (!kind || kind.includes(r.kind)) &&
     (!res || r.win === res) &&
     (!minXp || (r.xp ?? 0) >= minXp) &&
-    (!since || r.date >= since));
+    (!since || r.date >= since) && (!until || r.date < until));
 }
 
 function sortRows(list) {
@@ -736,6 +811,7 @@ function render() {
   $('#empty').hidden = has;
   $('#table').hidden = !has;
   $('#filters').hidden = !has;
+  $('#periodbar').hidden = !has;
   if (!has) { $('#cards').innerHTML = ''; return; }
   const me = rows.find(r => r.player)?.player;
   $('#who').textContent = me ? `– ${me}` : '';
@@ -748,6 +824,7 @@ function render() {
   renderCards(list);
   const sorted = sortRows(list);
   const numericSort = COLS.find(c => c.k === view.sort)?.num;
+  const rated = new Set(rows.filter(r => r.pr != null).map(shipIdOf));
 
   $('#thead').innerHTML = COLS.map(c =>
     `<th data-k="${c.k}" class="${c.num ? 'num' : ''} ${view.sort === c.k ? 'sorted' : ''}">${c.t}${view.sort === c.k ? (view.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('');
@@ -759,7 +836,7 @@ function render() {
       <td>${fmtDate(r.date)}</td>
       <td class="num muted">${tierText(r.tier)}</td>
       <td class="num">${mmText(r.mm)}</td>
-      <td class="ship">${flagIcon(r.ship)}<span class="kind-${r.kind}" title="${esc(KINDS[r.kind] || '')}">${esc(r.shipName)}</span></td>
+      <td class="ship">${flagIcon(r.ship)}<span class="kind-${r.kind} ${rated.has(shipIdOf(r)) ? 'shiplink' : ''}" title="${rated.has(shipIdOf(r)) ? 'Show your PR development on this ship' : esc(KINDS[r.kind] || '')}">${esc(r.shipName)}</span></td>
       <td class="muted">${classIcon(r.ship)}${esc(r.cls)}</td>
       <td>${esc(r.map)}</td>
       <td class="muted">${esc(r.mode)}</td>
@@ -829,6 +906,21 @@ function prText(pr) {
 }
 
 // Overall PR for a set of battles: totals against expected totals, as WoWS Numbers does per ship.
+// Trend arrow for the PR card: PR of the most recent battles against the same number before them.
+function prTrend(list) {
+  const rated = list.filter(r => r.pr != null).sort((a, b) => a.date - b.date);
+  const n = Math.min(50, Math.floor(rated.length / 2));
+  if (n < 10) return '';
+  const pr = part => {
+    let d = 0, f = 0, w = 0, ed = 0, ef = 0, ew = 0;
+    for (const r of part) { const e = EXPECTED[r.rec.result.shipId]; d += r.dmg; f += r.kills; w += r.win === 'W' ? 1 : 0; ed += e[0]; ef += e[1]; ew += e[2] / 100; }
+    return prFormula(d, f, w, ed, ef, ew);
+  };
+  const now = pr(rated.slice(-n)), before = pr(rated.slice(-2 * n, -n)), delta = now - before;
+  const tip = `Last ${n} battles: ${nf.format(now)}. The ${n} before them: ${nf.format(before)}.`;
+  return ` <span class="trend ${delta >= 0 ? 'up' : 'down'}" title="${tip}">${delta >= 0 ? '▲' : '▼'} ${delta >= 0 ? '+' : '−'}${nf.format(Math.abs(delta))}</span>`;
+}
+
 function prCard(list) {
   let dmg = 0, frags = 0, wins = 0, eDmg = 0, eFrags = 0, eWins = 0, n = 0;
   for (const r of list) {
@@ -840,14 +932,21 @@ function prCard(list) {
   if (!n) return '';
   const pr = prFormula(dmg, frags, wins, eDmg, eFrags, eWins), band = prBand(pr);
   return `<div class="card click" data-action="pr" title="Show PR over time"><div class="lbl">Personal Rating ↗</div>
-    <div class="val" style="color:${band.color}">${nf.format(pr)}</div>
+    <div class="val"><span style="color:${band.color}">${nf.format(pr)}</span>${prTrend(list)}</div>
     <div class="sub"><span class="prchip" style="background:${band.color}">${band.name}</span> ${nf.format(n)} PvP battles</div></div>`;
 }
 
 // ---------- PR over time ----------
 // Line: rolling PR over the last N battles (single-battle PR is far too noisy to read a trend from).
 // One dot per battle on the line: filled = victory, ring = defeat.
-const prChart = { list: [], roll: [], window: 50 };
+const prChart = { list: [], roll: [], window: 50, ship: null };   // ship: id to chart one ship, null = current filter
+const shipIdOf = r => r.rec.result?.shipId;
+// Ships with at least one rated (PvP) battle, most played first: [[shipId, row, count], ...].
+function ratedShips() {
+  const m = new Map();
+  for (const r of rows) if (r.pr != null) { const e = m.get(shipIdOf(r)) || [shipIdOf(r), r, 0]; e[2]++; m.set(e[0], e); }
+  return [...m.values()].sort((a, b) => b[2] - a[2]);
+}
 
 function rollingPR(list, window) {
   const sums = [[0, 0, 0, 0, 0, 0]];
@@ -861,8 +960,11 @@ function rollingPR(list, window) {
   });
 }
 
-function openPrChart() {
-  prChart.list = filtered().filter(r => r.pr != null).sort((a, b) => a.date - b.date);
+// shipId: chart every PvP battle on that ship (ignoring the filters); omit it to chart the current filter.
+function openPrChart(shipId = null) {
+  prChart.ship = shipId;
+  const source = shipId ? rows.filter(r => shipIdOf(r) === shipId) : filtered();
+  prChart.list = source.filter(r => r.pr != null).sort((a, b) => a.date - b.date);
   if (!prChart.list.length) return;
   $('#chart').classList.add('open'); $('#overlay').classList.add('open');
   renderPrChart();
@@ -907,6 +1009,10 @@ function renderPrChart() {
   $('#chart').innerHTML = `
     <div class="head">
       <h2>Personal Rating over time</h2>
+      <select id="chartship" title="Chart one ship, or the battles in the current filter">
+        <option value="">Battles in the current filter</option>
+        ${ratedShips().map(([id, r, c]) => `<option value="${id}" ${id === prChart.ship ? 'selected' : ''}>${tierText(r.tier)} ${esc(r.shipName)} (${nf.format(c)})</option>`).join('')}
+      </select>
       <span class="pr" style="color:${band.color};font:600 20px 'JetBrains Mono',monospace">${nf.format(last)}</span>
       <span class="prchip" style="background:${band.color}">${band.name}</span>
       <span class="${delta >= 0 ? 'pct up' : 'pct down'}" style="font-weight:600">${delta >= 0 ? '▲ +' : '▼ '}${nf.format(delta)}</span><span class="muted">vs ${span}</span>
@@ -916,7 +1022,7 @@ function renderPrChart() {
       <span class="muted">battles</span>
       <button class="btn ghost" id="chartclose">Close</button>
     </div>
-    <div class="muted">${nf.format(n)} PvP battles in the current filter · ${fmtDay(list[0].date)} – ${fmtDay(list[n - 1].date)} · ${win
+    <div class="muted">${nf.format(n)} PvP battles ${prChart.ship ? 'on ' + esc(list[0].shipName) + ' (all time, filters ignored)' : 'in the current filter'} · ${fmtDay(list[0].date)} – ${fmtDay(list[n - 1].date)} · ${win
       ? `Each point is your PR for that battle and the ${win - 1} before it. Fewer battles: reacts faster to your recent form. More battles: a smoother long-term trend.`
       : 'Each point is your PR for all battles up to and including that one.'}</div>
     <div class="plot">
@@ -935,6 +1041,7 @@ function renderPrChart() {
     </div>`;
 
   $('#chartclose').onclick = closeDetail;
+  $('#chartship').onchange = e => openPrChart(+e.target.value || null);
   $('#chart .seg').onclick = e => { const w = e.target.dataset.w; if (w != null) { prChart.window = +w; renderPrChart(); } };
   const svg = $('#chart svg'), tip = $('#tip'), cross = $('#cross'), focus = $('#focus');
   const indexAt = e => {
@@ -961,6 +1068,37 @@ function renderPrChart() {
   svg.onclick = e => { const b = list[indexAt(e)]; closeDetail(); openDetail(b.key); };
 }
 
+// A small table inside a card: one header row and a few labelled rows.
+function miniGrid(head, body) {
+  const cols = head.length - 1;
+  const row = (cells, cls) => cells.map((c, i) => `<span class="${i ? '' : 'rowlbl'} ${cls}">${c}</span>`).join('');
+  return `<div class="mini" style="grid-template-columns:auto repeat(${cols}, 1fr)">${row(head, 'hd')}${body.map(r => row(r, '')).join('')}</div>`;
+}
+// Win rate of a set of battles; dimmed when there are too few battles to mean much.
+// Win rate rated on the same scale and colours as PR.
+const WR_BANDS = [47, 49, 52, 54, 56, 60, 65];
+const wrBand = wr => { const b = PR_BANDS[WR_BANDS.filter(t => wr >= t).length]; return { name: b[1], color: b[2] }; };
+
+function winRateCell(list) {
+  if (!list.length) return '<span class="few">–</span>';
+  const wr = list.filter(r => r.win === 'W').length / list.length * 100;
+  const tip = `${nf.format(list.length)} battle${list.length === 1 ? '' : 's'}`;
+  if (list.length < 10) return `<span class="few" title="${tip} – too few to say much">${wr.toFixed(0)}%</span>`;
+  return `<span class="pr" style="color:${wrBand(wr).color}" title="${tip} · ${wrBand(wr).name}">${wr.toFixed(0)}%</span>`;
+}
+
+function winRateCard(withRes, wins) {
+  const tiers = [...new Set(withRes.map(r => r.tier).filter(Boolean))].sort((a, b) => a - b);
+  const byTier = t => withRes.filter(r => r.tier === t);
+  const grid = tiers.length < 2 ? '' : miniGrid(
+    ['Tier', ...tiers.map(tierText)],
+    [['Win rate', ...tiers.map(t => winRateCell(byTier(t)))],
+     ['Battles', ...tiers.map(t => `<span class="few">${nf.format(byTier(t).length)}</span>`)]]);
+  return `<div class="card ${grid ? 'wide' : ''}"><div class="lbl">Win rate</div>
+    <div class="val">${withRes.length ? `<span style="color:${wrBand(wins / withRes.length * 100).color}">${(wins / withRes.length * 100).toFixed(1)}%</span>` : '–'}</div>
+    <div class="sub">${withRes.length ? `<span class="prchip" style="background:${wrBand(wins / withRes.length * 100).color}">${wrBand(wins / withRes.length * 100).name}</span> ` : ''}${nf.format(wins)} victories</div>${grid}</div>`;
+}
+
 function mmCard(list) {
   const known = list.filter(r => r.mm != null);
   if (!known.length) return '';
@@ -971,7 +1109,11 @@ function mmCard(list) {
   return `<div class="card wide"><div class="lbl">Matchmaking</div>
     <div class="val"><span class="pct down">${uptier.toFixed(0)}%</span> <span class="unit">uptiered</span> &nbsp;<span class="pct up">${downtier.toFixed(0)}%</span> <span class="unit">downtiered</span></div>
     <div class="mmbar">${parts.map(x => `<span class="s${x.v}" style="width:${x.p}%" title="${MM_TEXT[x.v]}: ${x.p.toFixed(1)}%"></span>`).join('')}</div>
-    <div class="sub">${parts.map(x => `<span class="mm ${x.v < 0 ? 'down' : x.v > 0 ? 'up' : 'even'}">${x.a}</span> ${x.p.toFixed(0)}%`).join(' · ')} · avg ${avg >= 0 ? '+' : ''}${avg.toFixed(2)}</div></div>`;
+    ${miniGrid(
+      ['', ...parts.map(x => `<span class="mm ${x.v < 0 ? 'down' : x.v > 0 ? 'up' : 'even'}" title="${MM_TEXT[x.v]}">${x.a}</span>`)],
+      [['Battles', ...parts.map(x => `${x.p.toFixed(0)}%`)],
+       ['Win rate', ...parts.map(x => winRateCell(known.filter(r => r.mm === x.v)))]])}
+    <div class="sub">Average ${avg >= 0 ? '+' : ''}${avg.toFixed(2)} tiers from the top of the battle</div></div>`;
 }
 
 function placeText(r) {
@@ -998,18 +1140,20 @@ function renderCards(list) {
   const avgPlace = placed.length ? (placed.reduce((a, r) => a + r.place, 0) / placed.length).toFixed(1) : '–';
   const sub = r => r ? `${esc(r.shipName)} · ${esc(r.map)}` : '';
   $('#cards').innerHTML = `
+    <div class="smallcards">
     <div class="card"><div class="lbl">Battles</div><div class="val">${nf.format(list.length)}</div><div class="sub">${nf.format(withRes.length)} with results</div></div>
-    <div class="card"><div class="lbl">Win rate</div><div class="val">${withRes.length ? (wins / withRes.length * 100).toFixed(1) + '%' : '–'}</div><div class="sub">${nf.format(wins)} victories</div></div>
     <div class="card"><div class="lbl">Average damage</div><div class="val">${fmt(avg('dmg'))}</div><div class="sub">Average base XP ${fmt(avg('xp'))}</div></div>
     <div class="card click" data-key="${esc(bd?.key)}"><div class="lbl">Most damage</div><div class="val">${fmt(bd?.dmg)}</div><div class="sub">${sub(bd)}</div></div>
     <div class="card click" data-key="${esc(bx?.key)}"><div class="lbl">Most base XP</div><div class="val">${fmt(bx?.xp)}</div><div class="sub">${sub(bx)}</div></div>
-    <div class="card click" data-key="${esc(bk?.key)}"><div class="lbl">Most warships destroyed</div><div class="val">${fmt(bk?.kills)}</div><div class="sub">${sub(bk)}</div></div>
-    <div class="card"><div class="lbl">Average spotting dmg</div><div class="val">${fmt(avg('spot'))}</div><div class="sub">Average potential ${fmt(avg('potential'))}</div></div>
+    <div class="card click" data-key="${esc(bk?.key)}"><div class="lbl">Most destroyed</div><div class="val">${fmt(bk?.kills)}</div><div class="sub">${sub(bk)}</div></div>
+    <div class="card"><div class="lbl">Avg spotting dmg</div><div class="val">${fmt(avg('spot'))}</div><div class="sub">Average potential ${fmt(avg('potential'))}</div></div>
     <div class="card click" data-key="${esc(bs?.key)}"><div class="lbl">Most spotting dmg</div><div class="val">${fmt(bs?.spot)}</div><div class="sub">${sub(bs)}</div></div>
     <div class="card click" data-key="${esc(bp?.key)}"><div class="lbl">Most potential dmg</div><div class="val">${fmt(bp?.potential)}</div><div class="sub">${sub(bp)}</div></div>
     ${prCard(withRes)}
+    <div class="card"><div class="lbl">Top of team</div><div class="val">${nf.format(tops)}</div><div class="sub">Average team place ${avgPlace}</div></div>
+    </div>
     ${mmCard(withRes)}
-    <div class="card"><div class="lbl">Top of team</div><div class="val">${nf.format(tops)}</div><div class="sub">Average team place ${avgPlace}</div></div>`;
+    ${winRateCard(withRes, wins)}`;
 }
 
 function openDetail(key) {
@@ -1024,7 +1168,7 @@ function openDetail(key) {
     const teams = [0, 1].map(t => teamOrder(res.players, t));
     const teamTable = (list, title) => `
       <div class="team"><h3>${title}</h3><div class="tablewrap"><table>
-        <thead><tr><th class="num">#</th><th>Player</th><th>Ship</th><th class="num">Damage</th><th class="num">Destroyed</th><th class="num">Base XP</th><th class="num">PR</th><th></th></tr></thead>
+        <thead><tr><th class="num">#</th><th>Player</th><th>Ship</th><th class="num">Damage</th><th class="num">Destroyed</th><th class="num">Base XP</th><th class="num" title="PR for this battle only – not the player's overall rating">Battle PR</th><th></th></tr></thead>
         <tbody>${list.map((p, i) => { const tag = tagOf(p); return `<tr class="${p[8] ? 'me' : ''} ${tag ? 'hl-' + tag : ''}">
           <td class="num muted">${i + 1}</td>
           <td>${p[1] ? `<span class="muted">[${esc(p[1])}]</span> ` : ''}${esc(botName(p[0]))}${tag ? ` <span class="tag ${tag}">${TAGS[tag]}</span>` : ''}</td>
@@ -1054,6 +1198,7 @@ function openDetail(key) {
   }
   $('#drawer').innerHTML = `
     <button class="btn ghost close" id="close">Close</button>
+    ${rows.some(x => x.pr != null && shipIdOf(x) === shipIdOf(r)) ? '<button class="btn ghost close" id="shippr" style="margin-right:8px">PR on this ship ↗</button>' : ''}
     <h2 class="shipcell">${flagIcon(r.ship)}${classIcon(r.ship)}<span class="muted tier">${tierText(r.tier)}</span> <span class="kind-${r.kind}">${esc(r.shipName)}</span> <span class="pill ${r.win}">${pill}</span></h2>
     <div class="muted">${esc(r.map)} · ${esc(r.mode)} · ${fmtDate(r.date)} · ${esc(r.cls)}${r.nation ? ', ' + esc(r.nation) : ''}${r.kind ? ' · ' + KINDS[r.kind] : ''} · v${esc(r.rec.version)}</div>
     ${body}
@@ -1061,6 +1206,7 @@ function openDetail(key) {
     Open the replay by double-clicking the file in Explorer (the game must be closed).</p>`;
   $('#drawer').classList.add('open'); $('#overlay').classList.add('open');
   $('#close').onclick = closeDetail;
+  if ($('#shippr')) $('#shippr').onclick = () => { closeDetail(); openPrChart(shipIdOf(r)); };
   $('#copy').onclick = () => navigator.clipboard?.writeText(r.file.split('/').pop());
 }
 function closeDetail() { for (const id of ['#drawer', '#chart', '#overlay']) $(id).classList.remove('open'); }
@@ -1076,7 +1222,13 @@ $('#thead').onclick = e => {
   view.limit = 200;
   render();
 };
-$('#tbody').onclick = e => { const tr = e.target.closest('tr'); if (tr) openDetail(tr.dataset.key); };
+$('#tbody').onclick = e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  // The ship name opens that ship's PR chart; anywhere else on the row opens the battle.
+  if (e.target.closest('.shiplink')) openPrChart(shipIdOf(rows.find(r => r.key === tr.dataset.key)));
+  else openDetail(tr.dataset.key);
+};
 $('#cards').onclick = e => {
   const c = e.target.closest('.card.click');
   if (c?.dataset.action === 'pr') openPrChart();
@@ -1084,10 +1236,12 @@ $('#cards').onclick = e => {
 };
 $('#morebtn').onclick = () => { view.limit += 200; render(); };
 $('#reset').onclick = () => {
-  for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#known', '#minxp']) $(id).value = '';
+  for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#mm', '#known', '#minxp']) $(id).value = '';
+  setPeriod('');
   Object.assign(view, { sort: 'date', dir: -1, limit: 200 }); render();
 };
-for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#known', '#minxp']) $(id).addEventListener('input', () => { view.limit = 200; render(); });
+$('#period').onclick = e => { const p = e.target.dataset.p; if (p != null) { setPeriod(p); view.limit = 200; render(); } };
+for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#mm', '#known', '#minxp']) $(id).addEventListener('input', () => { view.limit = 200; render(); });
 
 // ---------- startup: show cached results, reconnect to the last folder ----------
 (async () => {
@@ -1099,9 +1253,13 @@ for (const id of ['#q', '#mode', '#cls', '#kind', '#res', '#period', '#mm', '#kn
     dirHandle = await db.get('dir');
     if (dirHandle) {
       $('#rescan').hidden = false;
+      $('#autowrap').hidden = false;
       $('#pick').textContent = 'Change folder';
-      if ((await dirHandle.queryPermission({ mode: 'read' })) === 'granted') scanHandle();
+      let wantAuto = false;
+      try { wantAuto = localStorage.getItem('autoscan') === '1'; } catch {}
+      if ((await dirHandle.queryPermission({ mode: 'read' })) === 'granted') await scanHandle();
       else $('#status').textContent = rows.length ? 'Click “Rescan” to load new replays' : '';
+      if (wantAuto) setAuto(true);
     }
   } catch (e) {
     console.warn(e);
