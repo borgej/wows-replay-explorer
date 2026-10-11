@@ -24,8 +24,9 @@ Everything runs in your browser. No server, no account, nothing is uploaded.
 - **PR over time** – click the Personal Rating card for a chart of your PR over the last
   10–100 battles, battle by battle, to see whether you are improving. Click a ship name in
   the list, or pick a ship in the chart, to see your development on that ship alone.
-- **Matchmaking** – shows whether you were uptiered (↓, ↓↓), top tier (↑, ↑↑) or in a
-  same-tier battle (=), how often each happens, and your win rate in each case.
+- **Matchmaking** – shows whether you were bottom tier (↓, ↓↓), mid tier (↕), top tier (↑, ↑↑)
+  or in a same-tier battle (=), how often each happens, and your win rate in each case. Click the card for a chart of how
+  you have been matched battle by battle.
 - **Team place** – where you finished on your team, ranked by base XP.
 - **Ships as in the game** – real names, tiers, nation flags, class icons, and premium /
   special ships marked in gold / orange.

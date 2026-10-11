@@ -136,6 +136,9 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .plot .grid { stroke: var(--line); stroke-width: 1; }
 .plot .band { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
 .plot .cross { stroke: var(--muted); stroke-width: 1; }
+.plot .lane { fill: var(--panel); }
+.plot .zero { stroke: var(--muted); stroke-width: 1; }
+.plot .ptitle { fill: var(--text); font-weight: 600; font-size: 12px; }
 .tip { position: absolute; top: 8px; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: var(--shadow); min-width: 210px; display: none; white-space: nowrap; }
 .tip b { font-size: 13px; }
 .tip dl { display: grid; grid-template-columns: auto auto; gap: 1px 14px; margin: 6px 0 0; }
@@ -149,8 +152,9 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .card .unit { font: 500 13px Inter, system-ui, sans-serif; color: var(--muted); }
 .mmbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0 6px; background: var(--panel-2); gap: 2px; }
 .mmbar span { display: block; height: 100%; }
-.mmbar .s-2 { background: var(--loss); } .mmbar .s-1 { background: color-mix(in srgb, var(--loss) 55%, transparent); }
-.mmbar .s0 { background: var(--muted); } .mmbar .s1 { background: color-mix(in srgb, var(--win) 55%, transparent); } .mmbar .s2 { background: var(--win); }
+.mmbar .b2 { background: var(--loss); } .mmbar .b1 { background: color-mix(in srgb, var(--loss) 55%, transparent); }
+.mmbar .bm { background: var(--draw); } .mmbar .be { background: var(--muted); }
+.mmbar .t1 { background: color-mix(in srgb, var(--win) 55%, transparent); } .mmbar .t2 { background: var(--win); }
 @media (max-width: 1100px) {
   .smallcards { flex-basis: 100%; grid-template-rows: none; grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .card.wide { flex: 1 1 270px; }
@@ -158,6 +162,7 @@ h2.shipcell .flag { width: 34px; height: 34px; }
 .mm.up { color: var(--win); }
 .mm.down { color: var(--loss); }
 .mm.even { color: var(--muted); }
+.mm.mid { color: var(--draw); }
 .podium { font-weight: 700; }
 /* highlighted players: own clan, friendly clans, known players */
 .tag { display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 12px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
@@ -207,7 +212,7 @@ tr.hl-player td:first-child { box-shadow: inset 3px 0 var(--gold); }
       <option value="">All results</option><option value="W">Victories only</option><option value="L">Defeats only</option><option value="D">Draws</option><option value="N">No results</option>
     </select>
     <select id="mm">
-      <option value="">All matchmaking</option><option value="-2">↓↓ Double uptiered</option><option value="-1">↓ Uptiered</option><option value="down">↓ / ↓↓ Any uptier</option><option value="0">= Same tier</option><option value="1">↑ Top tier, 1 below</option><option value="2">↑↑ Top tier, 2 below</option><option value="top">= / ↑ / ↑↑ Top tier</option>
+      <option value="">All matchmaking</option><option value="-2">↓↓ Bottom tier, 2 above</option><option value="-1">↓ Bottom tier, 1 above</option><option value="down">↓ / ↓↓ Bottom tier</option><option value="-0.5">↕ Mid tier</option><option value="0">= Same tier</option><option value="1">↑ Top tier, 1 below</option><option value="2">↑↑ Top tier, 2 below</option><option value="top">= / ↑ / ↑↑ Top tier</option>
     </select>
     <select id="known">
       <option value="">All players</option><option value="any">With notable players</option><option value="clan">With clanmates</option><option value="friend">With friendly clans</option><option value="player">With known players</option>
@@ -910,7 +915,7 @@ function filtered() {
   const known = $('#known').value, mmf = $('#mm').value;
   return rows.filter(r =>
     (!known || r.notable.some(x => known === 'any' || x.tag === known)) &&
-    (!mmf || (r.mm != null && (mmf === 'down' ? r.mm < 0 : mmf === 'top' ? r.mm >= 0 : r.mm === +mmf))) &&
+    (!mmf || (r.mm != null && (mmf === 'down' ? r.mm <= -1 : mmf === 'top' ? r.mm >= 0 : r.mm === +mmf))) &&
     (!q || q.split(/\s+/).every(w => r.search.includes(w))) &&
     (!mode || r.mode === mode) && (!cls || r.cls === cls) && (!kind || kind.includes(r.kind)) &&
     (!res || r.win === res) &&
@@ -989,21 +994,32 @@ function render() {
   $('#count').textContent = `${nf.format(list.length)} battles${list.length !== rows.length ? ` of ${nf.format(rows.length)}` : ''}`;
 }
 
-// Matchmaking spread for your ship: negative = uptiered (higher tiers in the battle), 0 = everyone
-// the same tier, positive = top tier with lower tiers below you. Ships without a known tier are ignored.
-// Superships (★) count as tier XI, so a tier IX facing them is double uptiered.
+// Where your ship sits in the battle's tier spread. Ships without a known tier are ignored.
+// Superships (★) count as tier XI, so a tier IX facing them is two tiers down.
+//   -2 / -1  bottom tier: nobody below you, ships 2 / 1 tiers above
+//   -0.5     mid tier: ships both above and below you
+//    0       everyone on the same tier
+//    1 / 2   top tier: nobody above you, ships 1 / 2 tiers below
+const MM = [
+  { v: -2, arrow: '↓↓', cls: 'down', bar: 'b2', text: 'Bottom tier (2 tiers above you)' },
+  { v: -1, arrow: '↓', cls: 'down', bar: 'b1', text: 'Bottom tier (1 tier above you)' },
+  { v: -0.5, arrow: '↕', cls: 'mid', bar: 'bm', text: 'Mid tier (ships both above and below you)' },
+  { v: 0, arrow: '=', cls: 'even', bar: 'be', text: 'Same tier for everyone' },
+  { v: 1, arrow: '↑', cls: 'up', bar: 't1', text: 'Top tier (1 tier below you)' },
+  { v: 2, arrow: '↑↑', cls: 'up', bar: 't2', text: 'Top tier (2 tiers below you)' },
+];
+const MM_TEXT = Object.fromEntries(MM.map(m => [m.v, m.text]));
 function matchmaking(res, myTier) {
   if (!myTier) return null;
   const tiers = res.players.map(p => shipById(p[3])?.tier).filter(Boolean);
   if (!tiers.length) return null;
   const max = Math.max(...tiers), min = Math.min(...tiers);
-  return max > myTier ? -Math.min(2, max - myTier) : Math.min(2, myTier - min);
+  if (max > myTier) return min < myTier ? -0.5 : -Math.min(2, max - myTier);
+  return Math.min(2, myTier - min);
 }
-const MM_TEXT = { '-2': 'Double uptiered (2 tiers above you)', '-1': 'Uptiered (1 tier above you)', 0: 'Same tier for everyone', 1: 'Top tier (1 tier below you)', 2: 'Top tier (2 tiers below you)' };
 function mmText(v) {
-  if (v == null) return '–';
-  const arrows = { '-2': '↓↓', '-1': '↓', 0: '=', 1: '↑', 2: '↑↑' }[v];
-  return `<span class="mm ${v < 0 ? 'down' : v > 0 ? 'up' : 'even'}" title="${MM_TEXT[v]}">${arrows}</span>`;
+  const m = MM.find(x => x.v === v);
+  return m ? `<span class="mm ${m.cls}" title="${m.text}">${m.arrow}</span>` : '–';
 }
 
 // ---------- Personal Rating (WoWS Numbers formula) ----------
@@ -1093,7 +1109,9 @@ function rollingPR(list, window) {
 }
 
 // shipId: chart every PvP battle on that ship (ignoring the filters); omit it to chart the current filter.
+let openChart = () => {};   // redraws whichever chart is open
 function openPrChart(shipId = null) {
+  openChart = renderPrChart;
   prChart.ship = shipId;
   const source = shipId ? rows.filter(r => shipIdOf(r) === shipId) : filtered();
   prChart.list = source.filter(r => r.pr != null).sort((a, b) => a.date - b.date);
@@ -1231,21 +1249,154 @@ function winRateCard(withRes, wins) {
     <div class="sub">${withRes.length ? `<span class="prchip" style="background:${wrBand(wins / withRes.length * 100).color}">${wrBand(wins / withRes.length * 100).name}</span> ` : ''}${nf.format(wins)} victories</div>${grid}</div>`;
 }
 
+// ---------- matchmaking over time ----------
+// Top panel: one lane per matchmaking bracket, one dot per battle (filled = victory, ring = defeat).
+// Bottom panel: the average tier position over the last N battles, where a battle scores the tiers
+// below you minus the tiers above you (-2 = bottom tier facing ships two tiers up, +2 = top tier).
+const mmChart = { list: [], window: 50 };
+const mmScore = v => (v === -0.5 ? 0 : v);
+const MM_LANES = [
+  [2, 'Top tier, 2 below'], [1, 'Top tier, 1 below'], [0, 'Same tier'],
+  [-0.5, 'Mid tier'], [-1, 'Bottom tier, 1 above'], [-2, 'Bottom tier, 2 above'],
+];
+const MM_INK = { up: '--win', down: '--loss', mid: '--draw', even: '--muted' };
+
+function openMmChart() {
+  mmChart.list = filtered().filter(r => r.mm != null && r.win !== 'N').sort((a, b) => a.date - b.date);
+  if (!mmChart.list.length) return;
+  openChart = renderMmChart;
+  $('#chart').classList.add('open'); $('#overlay').classList.add('open');
+  renderMmChart();
+}
+
+function renderMmChart() {
+  const { list, window: win } = mmChart;
+  const n = list.length;
+  const sums = [0];
+  for (const r of list) sums.push(sums[sums.length - 1] + mmScore(r.mm));
+  const roll = list.map((_, i) => { const from = win ? Math.max(0, i + 1 - win) : 0; return (sums[i + 1] - sums[from]) / (i + 1 - from); });
+  // The first few averages rest on a handful of battles and only add a spike; start the line after them.
+  const start = Math.min(n - 1, Math.min(win || 10, 10) - 1);
+  const recent = list.slice(win ? -win : 0);
+  const share = cls => Math.round(recent.filter(r => MM.find(m => m.v === r.mm).cls === cls).length / recent.length * 100);
+  const last = roll[n - 1];
+  const fmtDay = t => new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const signed = v => `${v > 0.004 ? '+' : v < -0.004 ? '−' : ''}${Math.abs(v).toFixed(2)}`;
+
+  const W = Math.max(320, $('#chart').clientWidth - 36), H = Math.max(380, window.innerHeight * 0.96 - 190);
+  const L = 176, Rm = 58, T = 8, B = 26, gap = 44;
+  const pw = W - L - Rm, hA = Math.round((H - T - B - gap) * 0.5), hB = H - T - B - gap - hA, topB = T + hA + gap;
+  const x = i => L + (n === 1 ? pw / 2 : i / (n - 1) * pw);
+
+  // --- top panel: lanes ---
+  const laneH = hA / MM_LANES.length;
+  const laneY = v => T + (MM_LANES.findIndex(l => l[0] === v) + 0.5) * laneH;
+  const lanes = MM_LANES.map(([v, label], i) => {
+    const m = MM.find(q => q.v === v), cnt = list.filter(r => r.mm === v).length, yy = T + (i + 0.5) * laneH;
+    return `${i % 2 ? '' : `<rect class="lane" x="${L}" y="${T + i * laneH}" width="${pw}" height="${laneH}"/>`}
+      <text x="${L - 12}" y="${yy + 4}" text-anchor="end"><tspan style="fill:var(${MM_INK[m.cls]});font-weight:700">${m.arrow}</tspan> ${label}</text>
+      <text x="${L + pw + 10}" y="${yy + 4}">${(cnt / n * 100).toFixed(0)}%</text>`;
+  }).join('');
+  const r = Math.max(1.8, Math.min(4.5, Math.min(pw / n / 2.2, laneH / 3)));
+  const dots = list.map((b, i) => b.win === 'W'
+    ? `<circle cx="${x(i).toFixed(1)}" cy="${laneY(b.mm).toFixed(1)}" r="${r}" fill="var(--win)"/>`
+    : `<circle cx="${x(i).toFixed(1)}" cy="${laneY(b.mm).toFixed(1)}" r="${r}" fill="var(--bg)" stroke="var(--loss)" stroke-width="${Math.max(1, r / 2.2)}"/>`).join('');
+
+  // --- bottom panel: average position ---
+  const shown = roll.slice(start);
+  const m = Math.max(0.5, Math.ceil(Math.max(...shown.map(Math.abs)) * 10) / 10 + 0.1);
+  const y = v => topB + hB / 2 - Math.max(-m, Math.min(m, v)) / m * (hB / 2);
+  const pts = shown.map((v, k) => `${x(start + k).toFixed(1)},${y(v).toFixed(1)}`);
+  const area = shown.length > 1 ? `M${x(start).toFixed(1)},${y(0)} L${pts.join(' L')} L${x(n - 1).toFixed(1)},${y(0)} Z` : '';
+  const half = Math.round(m * 5) / 10;
+  const axisB = [[m, signed(m)], [half, signed(half)], [0, '0'], [-half, signed(-half)], [-m, signed(-m)]].map(([v, t]) =>
+    `<line class="${v === 0 ? 'zero' : 'grid'}" x1="${L}" x2="${L + pw}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 12}" y="${y(v) + 4}" text-anchor="end">${t}</text>`).join('');
+  const ticks = n < 2 ? [0] : [...new Set([0, .25, .5, .75, 1].map(f => Math.round(f * (n - 1))))];
+  const xAxis = ticks.map(i => `<text x="${x(i)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${nf.format(i + 1)}</text>`).join('');
+
+  $('#chart').innerHTML = `
+    <div class="head">
+      <h2>Matchmaking over time</h2>
+      <span class="muted">${win ? `Last ${Math.min(win, n)} battles` : 'All battles'}:</span>
+      <span><b class="pct down">${share('down')}%</b> <span class="muted">bottom tier</span></span>
+      <span><b style="color:var(--draw)">${share('mid')}%</b> <span class="muted">mid tier</span></span>
+      <span><b>${share('even')}%</b> <span class="muted">same tier</span></span>
+      <span><b class="pct up">${share('up')}%</b> <span class="muted">top tier</span></span>
+      <div class="spacer"></div>
+      <span class="muted">Average over the last</span>
+      <div class="seg">${[10, 25, 50, 100, 0].map(w => `<button data-w="${w}" class="${w === win ? 'on' : ''}">${w || 'All'}</button>`).join('')}</div>
+      <span class="muted">battles</span>
+      <button class="btn ghost" id="chartclose">Close</button>
+    </div>
+    <div class="muted">${nf.format(n)} battles in the current filter · ${fmtDay(list[0].date)} – ${fmtDay(list[n - 1].date)} · oldest on the left</div>
+    <div class="plot">
+      <svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Matchmaking bracket per battle, and the average tier position over time">
+        <defs>
+          <clipPath id="mmAbove"><rect x="${L}" y="${topB}" width="${pw}" height="${hB / 2}"/></clipPath>
+          <clipPath id="mmBelow"><rect x="${L}" y="${topB + hB / 2}" width="${pw}" height="${hB / 2}"/></clipPath>
+        </defs>
+        ${lanes}${dots}
+        <text class="ptitle" x="${L}" y="${topB - 12}">Average tier position${win ? `, last ${win} battles` : ', all battles so far'} — now ${signed(last)}</text>
+        <text x="${L + pw}" y="${topB - 12}" text-anchor="end">above 0: mostly top tier · below 0: mostly bottom tier</text>
+        ${axisB}
+        <path d="${area}" fill="var(--win)" opacity=".22" clip-path="url(#mmAbove)"/>
+        <path d="${area}" fill="var(--loss)" opacity=".22" clip-path="url(#mmBelow)"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--text)" stroke-width="2" stroke-linejoin="round"/>
+        ${xAxis}
+        <line class="cross" id="cross" y1="${T}" y2="${topB + hB}" visibility="hidden"/>
+        <circle id="focus" r="7" fill="none" stroke="var(--text)" stroke-width="2" visibility="hidden"/>
+        <circle id="focus2" r="4" fill="var(--text)" visibility="hidden"/>
+      </svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="legend-row">
+      <span><i class="dot-w"></i>Victory</span><span><i class="dot-l"></i>Defeat</span>
+      <span>Top: one dot per battle, in the row for how you were matched (% of all battles on the right)</span>
+      <span>Bottom: a battle counts tiers below you minus tiers above you (−2 to +2) · hover for details, click to open the battle</span>
+    </div>`;
+
+  $('#chartclose').onclick = closeDetail;
+  $('#chart .seg').onclick = e => { const w = e.target.dataset.w; if (w != null) { mmChart.window = +w; renderMmChart(); } };
+  const svg = $('#chart svg'), tip = $('#tip'), cross = $('#cross'), focus = $('#focus'), focus2 = $('#focus2');
+  const indexAt = e => {
+    const box = svg.getBoundingClientRect();
+    return Math.max(0, Math.min(n - 1, Math.round(((e.clientX - box.left) / box.width * W - L) / pw * (n - 1))));
+  };
+  svg.onmousemove = e => {
+    const i = indexAt(e), b = list[i], cx = x(i), width = svg.getBoundingClientRect().width;
+    const tiers = b.rec.result.players.map(q => shipById(q[3])?.tier).filter(Boolean);
+    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('visibility', 'visible');
+    focus.setAttribute('cx', cx); focus.setAttribute('cy', laneY(b.mm)); focus.setAttribute('visibility', 'visible');
+    focus2.setAttribute('cx', cx); focus2.setAttribute('cy', y(roll[i])); focus2.setAttribute('visibility', i >= start ? 'visible' : 'hidden');
+    tip.innerHTML = `<b>${flagIcon(b.ship)}${tierText(b.tier)} ${esc(b.shipName)}</b> <span class="pill ${b.win}">${b.win === 'W' ? 'Victory' : b.win === 'D' ? 'Draw' : 'Defeat'}</span>
+      <div class="muted">#${nf.format(i + 1)} · ${fmtDate(b.date)} · ${esc(b.map)} · ${esc(b.mode)}</div>
+      <dl><dt>Matchmaking</dt><dd>${mmText(b.mm)} ${MM_LANES.find(l => l[0] === b.mm)[1]}</dd>
+      <dt>Tiers in the battle</dt><dd>${tierText(Math.min(...tiers))} – ${tierText(Math.max(...tiers))}</dd>
+      <dt>${win ? `Average, last ${Math.min(win, i + 1)} battles` : 'Average so far'}</dt><dd>${signed(roll[i])}</dd>
+      <dt>Damage</dt><dd>${fmt(b.dmg)}</dd><dt>Base XP</dt><dd>${fmt(b.xp)}</dd><dt>PR</dt><dd>${prText(b.pr)}</dd></dl>`;
+    tip.style.display = 'block';
+    const left = cx * width / W, flip = left > width / 2;
+    tip.style.left = flip ? '' : `${left + 14}px`;
+    tip.style.right = flip ? `${width - left + 14}px` : '';
+    tip.style.top = `${(T + hA + 6) * width / W}px`;
+  };
+  svg.onmouseleave = () => { tip.style.display = 'none'; for (const el of [cross, focus, focus2]) el.setAttribute('visibility', 'hidden'); };
+  svg.onclick = e => { const b = list[indexAt(e)]; closeDetail(); openDetail(b.key); };
+}
+
 function mmCard(list) {
   const known = list.filter(r => r.mm != null);
   if (!known.length) return '';
-  const pct = v => known.filter(r => r.mm === v).length / known.length * 100;
-  const parts = [[-2, '↓↓'], [-1, '↓'], [0, '='], [1, '↑'], [2, '↑↑']].map(([v, a]) => ({ v, a, p: pct(v) }));
-  const uptier = parts[0].p + parts[1].p, downtier = parts[3].p + parts[4].p;
-  const avg = known.reduce((s, r) => s + r.mm, 0) / known.length;
-  return `<div class="card wide"><div class="lbl">Matchmaking</div>
-    <div class="val"><span class="pct down">${uptier.toFixed(0)}%</span> <span class="unit">uptiered</span> &nbsp;<span class="pct up">${downtier.toFixed(0)}%</span> <span class="unit">downtiered</span></div>
-    <div class="mmbar">${parts.map(x => `<span class="s${x.v}" style="width:${x.p}%" title="${MM_TEXT[x.v]}: ${x.p.toFixed(1)}%"></span>`).join('')}</div>
+  const parts = MM.map(m => ({ ...m, p: known.filter(r => r.mm === m.v).length / known.length * 100 }));
+  const share = cls => parts.filter(x => x.cls === cls).reduce((a, x) => a + x.p, 0);
+  const uptier = share('down'), downtier = share('up');
+  return `<div class="card wide click" data-action="mm" title="Show matchmaking over time"><div class="lbl">Matchmaking ↗</div>
+    <div class="val"><span class="pct down">${uptier.toFixed(0)}%</span> <span class="unit">bottom tier</span> &nbsp;<span class="pct up">${downtier.toFixed(0)}%</span> <span class="unit">top tier</span></div>
+    <div class="mmbar">${parts.map(x => `<span class="${x.bar}" style="width:${x.p}%" title="${x.text}: ${x.p.toFixed(1)}%"></span>`).join('')}</div>
     ${miniGrid(
-      ['', ...parts.map(x => `<span class="mm ${x.v < 0 ? 'down' : x.v > 0 ? 'up' : 'even'}" title="${MM_TEXT[x.v]}">${x.a}</span>`)],
+      ['', ...parts.map(x => mmText(x.v))],
       [['Battles', ...parts.map(x => `${x.p.toFixed(0)}%`)],
-       ['Win rate', ...parts.map(x => winRateCell(known.filter(r => r.mm === x.v)))]])}
-    <div class="sub">Average ${avg >= 0 ? '+' : ''}${avg.toFixed(2)} tiers from the top of the battle</div></div>`;
+       ['Win rate', ...parts.map(x => winRateCell(known.filter(r => r.mm === x.v)))]])}</div>`;
 }
 
 function placeText(r) {
@@ -1344,7 +1495,7 @@ function openDetail(key) {
 function closeDetail() { for (const id of ['#drawer', '#chart', '#overlay']) $(id).classList.remove('open'); }
 $('#overlay').onclick = closeDetail;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
-window.addEventListener('resize', () => { if ($('#chart').classList.contains('open')) renderPrChart(); });
+window.addEventListener('resize', () => { if ($('#chart').classList.contains('open')) openChart(); });
 
 $('#thead').onclick = e => {
   const k = e.target.closest('th')?.dataset.k;
@@ -1364,6 +1515,7 @@ $('#tbody').onclick = e => {
 $('#cards').onclick = e => {
   const c = e.target.closest('.card.click');
   if (c?.dataset.action === 'pr') openPrChart();
+  else if (c?.dataset.action === 'mm') openMmChart();
   else if (c?.dataset.key) openDetail(c.dataset.key);
 };
 $('#morebtn').onclick = () => { view.limit += 200; render(); };
